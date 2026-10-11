@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
+import { autologinFiles, serviceShellLines } from "./accounts";
 
 export function dirnameOf(p: string): string {
   const d = p.replace(/\/[^/]*$/, "");
@@ -41,6 +42,10 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
         ]
       : []),
     ...extraFilePostLines(cfg.extraFiles),
+    ...Object.entries(autologinFiles(cfg)).flatMap(([path, content]) =>
+      extraFilePostLines([{ path, content }])
+    ),
+    ...serviceShellLines(cfg),
     ...flatpakShellLines(cfg),
   ];
   const postBlock = `%post
@@ -55,6 +60,12 @@ timezone ${sys.timezone} --utc
 network --bootproto=dhcp --hostname=${sys.hostname}
 rootpw --lock
 user --name=${sys.username} --password=${sys.password} --plaintext --groups=wheel
+${(cfg.users ?? [])
+  .map(
+    (u) =>
+      `user --name=${u.name} --password=${u.password} --plaintext${u.admin ? " --groups=wheel" : ""}`
+  )
+  .join("\n")}
 firstboot --disable
 bootloader --location=mbr
 zerombr

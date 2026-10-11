@@ -39,6 +39,15 @@ export function dockerfileFiles(cfg: DistroConfig): Record<string, string> {
     : "";
   const extraFiles = cfg.extraFiles ?? [];
   const extraDirs = [...new Set(extraFiles.map((f) => dirnameOf(f.path)))];
+  // líneas en formato RUN (continuaciones `; \`); la última queda sin continuación
+  const extraUsers = (cfg.users ?? [])
+    .map(
+      (u) =>
+        `    id "${u.name}" >/dev/null 2>&1 || useradd -m -s /bin/bash${u.admin ? " -G sudo" : ""} "${u.name}"; \\
+    echo ${sq(`${u.name}:${u.password}`)} | chpasswd; \\`
+    )
+    .join("\n")
+    .replace(/; \\$/, "");
 
   let run: string;
   if (engine === "livebuild") {
@@ -69,7 +78,7 @@ ${keyLines ? keyLines + "\n" : ""}${repoLines ? repoLines + "\n" : ""}    apt-ge
     apt-get clean; \\
     rm -rf /var/lib/apt/lists/*; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G sudo ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
   } else if (engine === "mkarchiso") {
     const repoLines = repos
       .map(
@@ -81,16 +90,16 @@ ${flatpakRun}    useradd -m -s /bin/bash -G sudo ${sys.username}; \\
 ${repoLines ? repoLines + "\n" : ""}    pacman -Syu --noconfirm ${["sudo", ...pkgs].join(" ")}; \\
     pacman -Scc --noconfirm; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G wheel ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
   } else if (engine === "kiwi") {
     run = `RUN zypper --gpg-auto-import-keys --non-interactive install ${pkgs.join(" ")}; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G users ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
   } else {
     run = `RUN dnf install -y ${pkgs.join(" ")}; \\
 ${flatpakRun}    dnf clean all; \\
     useradd -m -s /bin/bash -G wheel ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
   }
 
   const dockerfile = `FROM ${image}

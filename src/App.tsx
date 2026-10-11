@@ -166,6 +166,14 @@ export default function App() {
             <span>{(cfg.extraFiles ?? []).length}</span>
           </div>
           <div className="row">
+            <span>Usuarios</span>
+            <span>{1 + (cfg.users ?? []).length}</span>
+          </div>
+          <div className="row">
+            <span>Servicios</span>
+            <span>{(cfg.services ?? []).length}</span>
+          </div>
+          <div className="row">
             <span>Repos custom</span>
             <span>{activeRepos}</span>
           </div>

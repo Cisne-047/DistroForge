@@ -34,7 +34,20 @@ export function wslFiles(cfg: DistroConfig): Record<string, string> {
     })
     .join("\n");
   const flatpakBlock = flatpakShellLines(cfg, "chroot /rootfs ").join("\n");
-  const preConf = [extraFilesBlock, flatpakBlock].filter(Boolean).join("\n");
+  const wslUserLines = (cfg.users ?? [])
+    .map(
+      (u) =>
+        `chroot /rootfs id "${u.name}" >/dev/null 2>&1 || chroot /rootfs useradd -m -s /bin/bash${u.admin ? " -G wheel" : ""} "${u.name}"
+chroot /rootfs bash -c "echo ${sq(`${u.name}:${u.password}`)} | chpasswd"`
+    )
+    .join("\n");
+  const wslServiceLines = (cfg.services ?? [])
+    .filter((s) => /^[A-Za-z0-9@._-]+$/.test(s.unit))
+    .map((s) => `chroot /rootfs systemctl ${s.enabled ? "enable" : "disable"} "${s.unit}"`)
+    .join("\n");
+  const preConf = [extraFilesBlock, flatpakBlock, wslUserLines, wslServiceLines]
+    .filter(Boolean)
+    .join("\n");
 
   const confLines = [
     `cat > /rootfs/etc/wsl.conf <<'WSLEOF'`,

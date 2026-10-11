@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import type { CustomRepo, DistroConfig, ExtraFile, OutputFormat, SystemConfig } from "./types";
+import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, ServiceToggle, SystemConfig } from "./types";
 import { BASES, baseById, defaultConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
 import { generateProject, validate, downloadZip } from "./generators";
 
@@ -27,7 +27,7 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
                 output:
                   x.engine === "kiwi"
                     ? cfg.output
-                    : cfg.output === "qcow2"
+                    : ["qcow2", "usb", "vmdk", "vdi"].includes(cfg.output)
                       ? "iso"
                       : cfg.output,
               })
@@ -123,6 +123,105 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           />
           Inyectar cloud-init (NoCloud: usuario, hostname y zona horaria — útil en VMs/cloud)
         </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.autologin}
+            onChange={(e) => upd({ autologin: e.target.checked })}
+          />
+          Auto-login del usuario principal (SDDM/GDM/LightDM)
+        </label>
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          Usuarios extra
+          {(cfg.users ?? []).map((u, i) => {
+            const setU = (patch: Partial<ExtraUser>) =>
+              upd({ users: (cfg.users ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+            return (
+              <div key={i} style={{ display: "flex", gap: 8, margin: "6px 0" }}>
+                <input
+                  value={u.name}
+                  placeholder="usuario"
+                  style={{ flex: 1 }}
+                  onChange={(e) => setU({ name: e.target.value })}
+                />
+                <input
+                  type="password"
+                  value={u.password}
+                  placeholder="contraseña"
+                  style={{ flex: 1 }}
+                  onChange={(e) => setU({ password: e.target.value })}
+                />
+                <label className="chk">
+                  <input
+                    type="checkbox"
+                    checked={u.admin}
+                    onChange={(e) => setU({ admin: e.target.checked })}
+                  />
+                  admin
+                </label>
+                <button
+                  className="icon"
+                  title="Eliminar"
+                  onClick={() =>
+                    upd({ users: (cfg.users ?? []).filter((_, j) => j !== i) })
+                  }
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+          <button
+            className="btn ghost"
+            onClick={() =>
+              upd({ users: [...(cfg.users ?? []), { name: "", password: "", admin: false }] })
+            }
+          >
+            + Añadir usuario
+          </button>
+        </div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          Servicios systemd (habilitar/deshabilitar en la imagen)
+          {(cfg.services ?? []).map((s, i) => {
+            const setSvc = (patch: Partial<ServiceToggle>) =>
+              upd({
+                services: (cfg.services ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)),
+              });
+            return (
+              <div key={i} style={{ display: "flex", gap: 8, margin: "6px 0" }}>
+                <input
+                  value={s.unit}
+                  placeholder="ej. sshd.service"
+                  style={{ flex: 1 }}
+                  onChange={(e) => setSvc({ unit: e.target.value })}
+                />
+                <label className="chk">
+                  <input
+                    type="checkbox"
+                    checked={s.enabled}
+                    onChange={(e) => setSvc({ enabled: e.target.checked })}
+                  />
+                  activo
+                </label>
+                <button
+                  className="icon"
+                  title="Eliminar"
+                  onClick={() =>
+                    upd({ services: (cfg.services ?? []).filter((_, j) => j !== i) })
+                  }
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+          <button
+            className="btn ghost"
+            onClick={() => upd({ services: [...(cfg.services ?? []), { unit: "", enabled: true }] })}
+          >
+            + Añadir servicio
+          </button>
+        </div>
         <div className="field" style={{ gridColumn: "1 / -1" }}>
           Wallpaper (se aplica en GNOME/MATE/Cinnamon/Budgie/Xfce; en KDE/i3/Sway solo se copia)
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -358,6 +457,9 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
       ? [
           { v: "iso", l: "ISO híbrida (live/installer)" },
           { v: "qcow2", l: "Disco QCOW2 (VM)" },
+          { v: "usb", l: "Imagen USB / disco raw" },
+          { v: "vmdk", l: "Disco VMware (VMDK)" },
+          { v: "vdi", l: "Disco VirtualBox (VDI)" },
           { v: "oci", l: "Imagen OCI (Docker/Podman)" },
           { v: "wsl", l: "Rootfs WSL (importar en Windows)" },
         ]

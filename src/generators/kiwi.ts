@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
+import { autologinFiles, serviceShellLines } from "./accounts";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -27,7 +28,11 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
   const typeTag =
     cfg.output === "qcow2"
       ? `<type image="qcow2" filesystem="btrfs" primary="true"/>`
-      : `<type image="iso" primary="true" firmware="uefi"/>`;
+      : cfg.output === "usb"
+        ? `<type image="oem" filesystem="btrfs" primary="true"/>`
+        : cfg.output === "vmdk" || cfg.output === "vdi"
+          ? `<type image="vmx" filesystem="btrfs" format="${cfg.output}" primary="true"/>`
+          : `<type image="iso" primary="true" firmware="uefi"/>`;
 
   const repoTags = [
     `    <repository type="rpm-md" alias="${esc(base.id)}" url="${esc(base.mirror)}"/>`,
@@ -68,7 +73,13 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
     ${typeTag}
   </preferences>
   <users>
-    <user name="${esc(sys.username)}" password="${esc(sys.password)}" home="/home/${esc(sys.username)}" groups="users"/>
+${[
+    `    <user name="${esc(sys.username)}" password="${esc(sys.password)}" home="/home/${esc(sys.username)}" groups="users"/>`,
+    ...(cfg.users ?? []).map(
+      (u) =>
+        `    <user name="${esc(u.name)}" password="${esc(u.password)}" home="/home/${esc(u.name)}" groups="users${u.admin ? ",wheel" : ""}"/>`
+    ),
+  ].join("\n")}
   </users>
 ${repoTags}
   <packages type="image">
@@ -90,6 +101,7 @@ ${pkgs}
     ...effectiveRepos(cfg)
       .filter((r) => r.gpgKey)
       .map((r) => `rpm --import "${r.gpgKey}"`),
+    ...serviceShellLines(cfg),
   ];
   if (cfg.motd) shLines.push("cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF");
   if (hasFlatpakApps(cfg)) shLines.push(...flatpakShellLines(cfg));
@@ -134,6 +146,9 @@ echo "Imagen lista en ./out"
     "kiwi/config.sh": configSh,
     ...Object.fromEntries(
       (cfg.extraFiles ?? []).map((f) => [`kiwi/root${f.path}`, f.content])
+    ),
+    ...Object.fromEntries(
+      Object.entries(autologinFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
     ),
     ...wallpaperFiles,
     "build.sh": buildSh,

@@ -43,8 +43,8 @@ export function validate(cfg: DistroConfig): string[] {
   if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(cfg.system.username))
     out.push("Usuario: minúsculas, debe empezar por letra o _.");
   if (!cfg.system.password) out.push("Falta la contraseña del usuario.");
-  if (cfg.output === "qcow2" && baseById(cfg.base).engine !== "kiwi")
-    out.push("QCOW2 solo disponible con motor KIWI (bases openSUSE).");
+  if (["qcow2", "usb", "vmdk", "vdi"].includes(cfg.output) && baseById(cfg.base).engine !== "kiwi")
+    out.push("QCOW2/USB/VMDK/VDI solo disponibles con motor KIWI (bases openSUSE).");
   if (cfg.output === "oci" && baseById(cfg.base).engine === "manual")
     out.push("OCI no disponible en bases manuales (Gentoo/Solus).");
   if (cfg.output === "wsl" && baseById(cfg.base).engine === "manual")
@@ -80,6 +80,19 @@ export function validate(cfg: DistroConfig): string[] {
     );
   if (baseById(cfg.base).engine === "mkarchiso" && cfg.repos.some((r) => r.gpgKey))
     out.push("Arch: los repos custom van con TrustAll; la key GPG no se usa.");
+  const seenUsers = new Set<string>();
+  (cfg.users ?? []).forEach((u, i) => {
+    if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(u.name))
+      out.push(`Usuario extra #${i + 1}: nombre inválido (minúsculas, empieza por letra o _).`);
+    else if (u.name === cfg.system.username || seenUsers.has(u.name))
+      out.push(`Usuario extra "${u.name}": nombre repetido.`);
+    else seenUsers.add(u.name);
+    if (!u.password) out.push(`Usuario extra "${u.name || i + 1}": falta la contraseña.`);
+  });
+  (cfg.services ?? []).forEach((s, i) => {
+    if (!/^[A-Za-z0-9@._-]+$/.test(s.unit))
+      out.push(`Servicio #${i + 1}: nombre de unidad inválido (ej. sshd.service).`);
+  });
   cfg.repos.forEach((r, i) => {
     if (!r.url) {
       if (r.alias || r.gpgKey) out.push(`Repo #${i + 1}: falta la URL.`);
@@ -273,6 +286,7 @@ Distro personalizada generada con DistroForge.
 - Paquetes extra: ${cfg.packages.length ? cfg.packages.join(", ") : "ninguno"}
 - Flatpak: ${cfg.flatpakApps?.length ? cfg.flatpakApps.join(", ") : "ninguno"}
 - Ficheros extra: ${cfg.extraFiles?.length ?? 0}
+- Usuarios extra: ${cfg.users?.length ?? 0} · Servicios systemd: ${cfg.services?.length ?? 0}${cfg.autologin ? " · auto-login" : ""}
 - Repos custom: ${repos.length ? repos.map((r) => r.url).join(", ") : "ninguno"}
 - Salida: ${cfg.output.toUpperCase()}${cfg.cloudInit ? " + cloud-init" : ""}
 - Wallpaper: ${cfg.wallpaper ? "sí" : "no"}

@@ -14,7 +14,7 @@ export type BaseId =
   | "fedora"
   | "gentoo"
   | "solus";
-export type OutputFormat = "iso" | "qcow2" | "oci" | "wsl";
+export type OutputFormat = "iso" | "qcow2" | "usb" | "vmdk" | "vdi" | "oci" | "wsl";
 
 export interface CustomRepo {
   alias: string;
@@ -41,6 +41,19 @@ export interface ExtraFile {
   content: string;
 }
 
+/** Usuario adicional al principal (paridad con la pestaña General de SUSE Studio). */
+export interface ExtraUser {
+  name: string;
+  password: string;
+  admin: boolean;
+}
+
+/** Unidad systemd que se habilita o deshabilita en la imagen (pestaña Startup). */
+export interface ServiceToggle {
+  unit: string;
+  enabled: boolean;
+}
+
 export interface DistroConfig {
   name: string;
   base: BaseId;
@@ -53,6 +66,12 @@ export interface DistroConfig {
   flatpakApps: string[];
   /** ficheros a copiar a la imagen por ruta absoluta */
   extraFiles: ExtraFile[];
+  /** usuarios adicionales (nombre, contraseña, admin) */
+  users: ExtraUser[];
+  /** servicios systemd a habilitar/deshabilitar */
+  services: ServiceToggle[];
+  /** auto-login del usuario principal en el escritorio */
+  autologin: boolean;
   /** inyectar cloud-init (NoCloud) para VMs/cloud */
   cloudInit: boolean;
   /** mensaje del día (/etc/motd) */

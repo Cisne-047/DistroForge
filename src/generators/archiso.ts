@@ -4,6 +4,11 @@ import { sanitizeAlias } from "./livebuild";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakApps, flatpakPackages, FLATHUB, hasFlatpakApps } from "./flatpak";
 import {
+  autologinFiles,
+  serviceExecStartLines,
+  userExecStartLines,
+} from "./accounts";
+import {
   archDconfBootFiles,
   dconfDbFiles,
   dconfSchemaFor,
@@ -91,6 +96,39 @@ WantedBy=multi-user.target
       "L /etc/systemd/system/multi-user.target.wants/distroforge-flatpak.service - - - - /etc/systemd/system/distroforge-flatpak.service\n";
   }
 
+  // usuarios extra, servicios y auto-login: sin hooks de chroot en archiso, todo
+  // se ejecuta en el primer arranque vía unidades oneshot
+  const accountFiles: Record<string, string> = {};
+  const userExecs = userExecStartLines(cfg, "wheel");
+  if (userExecs.length)
+    accountFiles["archiso/airootfs/etc/systemd/system/distroforge-users.service"] = `[Unit]
+Description=DistroForge - crea los usuarios extra
+[Service]
+Type=oneshot
+${userExecs.join("\n")}
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+`;
+  const svcExecs = serviceExecStartLines(cfg);
+  if (svcExecs.length)
+    accountFiles["archiso/airootfs/etc/systemd/system/distroforge-services.service"] = `[Unit]
+Description=DistroForge - habilita/deshabilita servicios
+[Service]
+Type=oneshot
+${svcExecs.join("\n")}
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+`;
+  for (const name of ["distroforge-users", "distroforge-services"]) {
+    if (accountFiles[`archiso/airootfs/etc/systemd/system/${name}.service`])
+      accountFiles[`archiso/airootfs/etc/tmpfiles.d/${name}.conf`] =
+        `L /etc/systemd/system/multi-user.target.wants/${name}.service - - - - /etc/systemd/system/${name}.service\n`;
+  }
+  for (const [p, c] of Object.entries(autologinFiles(cfg)))
+    accountFiles[`archiso/airootfs${p}`] = c;
+
   if (wallpaperApplies(cfg)) {
     const wf = wallpaperFileName(cfg)!;
     wallpaperFiles[`archiso/airootfs/usr/share/backgrounds/${wf}`] = wallpaperDataUrl(cfg)!;
@@ -120,6 +158,7 @@ WantedBy=multi-user.target
       (cfg.extraFiles ?? []).map((f) => [`archiso/airootfs${f.path}`, f.content])
     ),
     ...flatpakFiles,
+    ...accountFiles,
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
+import { autologinFiles, extraUserShellLines, serviceShellLines } from "./accounts";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -66,6 +67,7 @@ set -e
 id "${sys.username}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G sudo "${sys.username}"
 echo "${dq(sys.username)}:${dq(sys.password)}" | chpasswd
 usermod -aG sudo "${sys.username}" || true
+${extraUserShellLines(cfg, "sudo").join("\n")}
 `;
 
   const repoHooks = repos.map((r, i) => {
@@ -124,6 +126,15 @@ ${flatpakShellLines(cfg).join("\n")}
 `
     : "";
 
+  const servicesHook =
+    (cfg.services ?? []).length
+      ? `#!/bin/sh
+set -e
+# DistroForge - servicios systemd
+${serviceShellLines(cfg).join("\n")}
+`
+      : "";
+
   const wallpaperFiles: Record<string, string> = {};
   if (wallpaperApplies(cfg)) {
     const wf = wallpaperFileName(cfg)!;
@@ -157,6 +168,15 @@ ${flatpakShellLines(cfg).join("\n")}
     ...Object.fromEntries(
       (cfg.extraFiles ?? []).map((f) => [`livebuild/config/includes.chroot${f.path}`, f.content])
     ),
+    ...Object.fromEntries(
+      Object.entries(autologinFiles(cfg)).map(([p, c]) => [
+        `livebuild/config/includes.chroot${p}`,
+        c,
+      ])
+    ),
+    ...(servicesHook
+      ? { "livebuild/config/hooks/0340-services.hooks.chroot": servicesHook }
+      : {}),
     ...(flatpakHook ? { "livebuild/config/hooks/0350-flatpak.hooks.chroot": flatpakHook } : {}),
     ...wallpaperFiles,
     "build.sh": buildSh,

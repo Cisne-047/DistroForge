@@ -8,7 +8,7 @@ const PNG_1PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 function outputsFor(engine: string): OutputFormat[] {
-  if (engine === "kiwi") return ["iso", "qcow2", "oci", "wsl"];
+  if (engine === "kiwi") return ["iso", "qcow2", "usb", "vmdk", "vdi", "oci", "wsl"];
   if (engine === "manual") return ["iso"];
   return ["iso", "oci", "wsl"];
 }
@@ -478,5 +478,130 @@ describe("bloque 5: claves GPG por motor", () => {
     const c = cfgFor("arch");
     c.repos = [keyedRepo];
     expect(validate(c).some((i) => i.includes("TrustAll"))).toBe(true);
+  });
+});
+
+describe("bloque 6: paridad SUSE Studio (usuarios, servicios, autologin, formatos)", () => {
+  const studioCfg = (base: BaseId): DistroConfig => {
+    const c = cfgFor(base);
+    c.users = [
+      { name: "ana", password: "ana12345", admin: true },
+      { name: "pepe", password: "pepe12345", admin: false },
+    ];
+    c.services = [
+      { unit: "sshd.service", enabled: true },
+      { unit: "bluetooth.service", enabled: false },
+    ];
+    c.autologin = true;
+    return c;
+  };
+
+  it("live-build: usuarios extra en hook, hook de servicios y autologin solo con DM", () => {
+    const files = generateProject(studioCfg("debian"));
+    const hook = files["livebuild/config/hooks/0100-distroforge-user.hooks.chroot"];
+    expect(hook).toContain('useradd -m -s /bin/bash -G sudo "ana"');
+    expect(hook).toContain('useradd -m -s /bin/bash "pepe"');
+    const svc = files["livebuild/config/hooks/0340-services.hooks.chroot"];
+    expect(svc).toContain('systemctl enable "sshd.service"');
+    expect(svc).toContain('systemctl disable "bluetooth.service"');
+    // escritorio "none" no tiene DM: sin fichero de autologin
+    expect(Object.keys(files).some((p) => p.includes("autologin"))).toBe(false);
+    const xf = studioCfg("debian");
+    xf.desktop = "xfce";
+    expect(generateProject(xf)["livebuild/config/includes.chroot/etc/lightdm/lightdm.conf"])
+      .toContain("autologin-user=user");
+  });
+
+  it("archiso: unidades oneshot de usuarios y servicios con tmpfiles", () => {
+    const files = generateProject(studioCfg("arch"));
+    expect(files["archiso/airootfs/etc/systemd/system/distroforge-users.service"]).toContain(
+      'useradd -m -s /bin/bash -G wheel "ana"'
+    );
+    expect(files["archiso/airootfs/etc/systemd/system/distroforge-services.service"]).toContain(
+      'systemctl enable --now "sshd.service"'
+    );
+    expect(files["archiso/airootfs/etc/tmpfiles.d/distroforge-users.conf"]).toContain(
+      "multi-user.target.wants"
+    );
+  });
+
+  it("KIWI: usuarios en XML, servicios en config.sh y formatos oem/vmx", () => {
+    const c = studioCfg("opensuse-tumbleweed");
+    const xml = generateProject(c)["kiwi/config.xml"];
+    expect(xml).toContain('name="ana"');
+    expect(xml).toContain('groups="users,wheel"');
+    expect(generateProject(c)["kiwi/config.sh"]).toContain('systemctl enable "sshd.service"');
+    c.output = "usb";
+    expect(generateProject(c)["kiwi/config.xml"]).toContain('image="oem"');
+    c.output = "vmdk";
+    expect(generateProject(c)["kiwi/config.xml"]).toContain('image="vmx"');
+    expect(generateProject(c)["kiwi/config.xml"]).toContain('format="vmdk"');
+    c.output = "vdi";
+    expect(generateProject(c)["kiwi/config.xml"]).toContain('format="vdi"');
+  });
+
+  it("kickstart: usuarios nativos, servicios y autologin GDM en %post", () => {
+    const c = studioCfg("fedora");
+    c.desktop = "gnome";
+    const ks = generateProject(c)["fedora/ks.cfg"];
+    expect(ks).toContain("user --name=ana --password=ana12345 --plaintext --groups=wheel");
+    expect(ks).toContain("user --name=pepe --password=pepe12345 --plaintext");
+    expect(ks).toContain('systemctl enable "sshd.service"');
+    expect(ks).toContain("cat > /etc/gdm/custom.conf <<'DFEOF'");
+  });
+
+  it("OCI y WSL: usuarios extra y servicios con chroot", () => {
+    const c = studioCfg("debian");
+    c.output = "oci";
+    const df = generateProject(c)["Dockerfile"];
+    expect(df).toContain('useradd -m -s /bin/bash -G sudo "ana"');
+    expect(df).toContain("ana:ana12345");
+    c.output = "wsl";
+    const sh = generateProject(c)["wsl/rootfs.sh"];
+    expect(sh).toContain('chroot /rootfs useradd -m -s /bin/bash -G wheel "ana"');
+    expect(sh).toContain('chroot /rootfs systemctl enable "sshd.service"');
+  });
+
+  it("cloud-init: usuarios extra en el YAML con sudo según admin", () => {
+    const c = studioCfg("debian");
+    c.cloudInit = true;
+    const yml =
+      generateProject(c)["livebuild/config/includes.chroot/etc/cloud/cloud.cfg.d/80-distroforge.cfg"];
+    expect(yml).toContain("- name: ana");
+    expect(yml).toContain("sudo: ALL=(ALL) ALL");
+    expect(yml).toContain("- name: pepe");
+    expect(yml).toContain("sudo: false");
+  });
+
+  it("validate: usuarios repetidos, inválidos, sin contraseña y unidad inválida", () => {
+    const c = cfgFor("debian");
+    c.users = [
+      { name: "user", password: "x1234567", admin: false },
+      { name: "Ana", password: "x1234567", admin: false },
+      { name: "ok2", password: "", admin: false },
+    ];
+    const issues = validate(c);
+    expect(issues.some((i) => i.includes("repetido"))).toBe(true);
+    expect(issues.some((i) => i.includes("inválido"))).toBe(true);
+    expect(issues.some((i) => i.includes("contraseña"))).toBe(true);
+    const s = cfgFor("debian");
+    s.services = [{ unit: "mal servicio!", enabled: true }];
+    expect(validate(s).some((i) => i.includes("unidad"))).toBe(true);
+  });
+
+  it("formatos USB/VMDK/VDI solo con motor KIWI y YAML de CI válido", () => {
+    for (const o of ["usb", "vmdk", "vdi"] as OutputFormat[]) {
+      const c = cfgFor("debian");
+      c.output = o;
+      expect(validate(c).some((i) => i.includes("KIWI"))).toBe(true);
+    }
+    for (const b of BASES) {
+      for (const o of outputsFor(b.engine)) {
+        const c = cfgFor(b.id);
+        c.output = o;
+        expect(() => yamlLoad(generateProject(c)[".github/workflows/build.yml"]), `${b.id}/${o}`)
+          .not.toThrow();
+      }
+    }
   });
 });
