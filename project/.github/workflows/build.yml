@@ -1,0 +1,21 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Construir imagen OCI
+        run: |
+          docker build -t mi-distro:1.0.0 .
+          docker save mi-distro:1.0.0 -o mi-distro.tar
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: mi-distro-oci
+          path: mi-distro.tar
+          if-no-files-found: error

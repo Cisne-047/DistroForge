@@ -41,4 +41,5 @@ src/
   types.ts          DistroConfig
 tests/              suite de generadores (incluye lint de YAML de CI)
 scripts/dump.ts     vuelca recetas a disco
+project/            proyecto de distro generado, listo para subir a su propio repo
 ```
