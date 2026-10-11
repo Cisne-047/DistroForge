@@ -221,22 +221,6 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             </label>
           </>
         )}
-        <label className="field" style={{ gridColumn: "1 / -1" }}>
-          Mensaje MOTD (/etc/motd)
-          <textarea
-            value={cfg.motd}
-            rows={2}
-            onChange={(e) => upd({ motd: e.target.value })}
-          />
-        </label>
-        <label className="chk" style={{ gridColumn: "1 / -1" }}>
-          <input
-            type="checkbox"
-            checked={cfg.cloudInit}
-            onChange={(e) => upd({ cloudInit: e.target.checked })}
-          />
-          Inyectar cloud-init (NoCloud: usuario, hostname y zona horaria — útil en VMs/cloud)
-        </label>
         <label className="chk" style={{ gridColumn: "1 / -1" }}>
           <input
             type="checkbox"
@@ -400,6 +384,124 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           <button className="btn ghost" onClick={addExtra}>
             + Añadir fichero
           </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function BrandingStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const timeout = cfg.grub?.timeout ?? 10;
+  const params = cfg.grub?.extraParams ?? "";
+  const b = baseById(cfg.base);
+  return (
+    <section>
+      <h2>3. Branding</h2>
+      <p className="hint">
+        Cómo luce y arranca tu distro: mensaje de bienvenida, fondo de pantalla y menú GRUB.
+        La vista previa refleja la config al instante.
+      </p>
+      <div className="branding-grid">
+        <div>
+          <div className="fields">
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
+              Mensaje MOTD (/etc/motd)
+              <textarea
+                rows={3}
+                value={cfg.motd}
+                onChange={(e) => upd({ motd: e.target.value })}
+              />
+            </label>
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
+              Fondo de pantalla (dconf/xfconf en GNOME/MATE/Cinnamon/Budgie/Xfce; solo copia en
+              KDE/i3/Sway)
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {cfg.wallpaper ? (
+                  <>
+                    <img src={cfg.wallpaper} alt="wallpaper actual" className="wall-prev" />
+                    <button className="btn ghost" onClick={() => upd({ wallpaper: "" })}>
+                      Quitar
+                    </button>
+                  </>
+                ) : (
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      if (f.size > 2 * 1024 * 1024) {
+                        alert("Imagen demasiado grande (máximo 2 MB).");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => upd({ wallpaper: String(reader.result) });
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+            <label className="field">
+              GRUB: timeout (segundos)
+              <input
+                type="number"
+                min={0}
+                max={999}
+                value={timeout}
+                onChange={(e) => upd({ grub: { ...cfg.grub, timeout: Number(e.target.value) } })}
+              />
+            </label>
+            <label className="field">
+              GRUB: parámetros del kernel
+              <input
+                value={params}
+                placeholder="ej. quiet splash"
+                onChange={(e) => upd({ grub: { ...cfg.grub, extraParams: e.target.value } })}
+              />
+            </label>
+            <label className="chk" style={{ gridColumn: "1 / -1" }}>
+              <input
+                type="checkbox"
+                checked={cfg.autologin}
+                onChange={(e) => upd({ autologin: e.target.checked })}
+              />
+              Auto-login del usuario principal (SDDM/GDM/LightDM)
+            </label>
+          </div>
+        </div>
+        <div className="preview">
+          <div className="grub-mock">
+            <div className="grub-title">GNU GRUB&nbsp;&nbsp;version 2.12</div>
+            <div className="grub-entry grub-sel">* {cfg.name || "mi-distro"} (linux)</div>
+            <div className="grub-entry">Memory test (memtest86+)</div>
+            <div className="grub-entry">System setup</div>
+            <div className="grub-foot">
+              Use ↑ y ↓ para seleccionar… timeout: {Math.max(0, timeout)}s
+            </div>
+          </div>
+          <div
+            className="desk-mock"
+            style={
+              cfg.wallpaper
+                ? {
+                    backgroundImage: `url(${cfg.wallpaper})`,
+                    backgroundSize: "cover",
+                  }
+                : undefined
+            }
+          >
+            <div className="desk-login">
+              <div className="desk-host">{cfg.system.hostname}</div>
+              <div className="desk-user">
+                {cfg.system.username || "user"}@{cfg.system.hostname}:~$
+              </div>
+              {cfg.motd && <div className="desk-motd">{cfg.motd}</div>}
+              {cfg.autologin && <div className="desk-badge">auto-login activo</div>}
+            </div>
+            <div className="desk-note">{b.label}</div>
+          </div>
         </div>
       </div>
     </section>

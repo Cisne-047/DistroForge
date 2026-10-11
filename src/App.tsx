@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import type { DistroConfig } from "./types";
 import { BASES, baseById, defaultConfig, mergeConfig } from "./catalog";
 import { decodeConfig } from "./share";
-import { BaseStep, SystemStep, ReposStep, PackagesStep, OutputStep } from "./steps";
+import { BaseStep, SystemStep, BrandingStep, ReposStep, PackagesStep, OutputStep } from "./steps";
 
 const STEPS = [
   { id: "base", label: "1 · Base" },
   { id: "system", label: "2 · Sistema" },
-  { id: "repos", label: "3 · Repos" },
-  { id: "packages", label: "4 · Paquetes" },
-  { id: "output", label: "5 · Construir" },
+  { id: "branding", label: "3 · Branding" },
+  { id: "repos", label: "4 · Repos" },
+  { id: "packages", label: "5 · Paquetes" },
+  { id: "output", label: "6 · Construir" },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -141,6 +142,7 @@ export default function App() {
         <div>
           {step === "base" && <BaseStep cfg={cfg} upd={upd} />}
           {step === "system" && <SystemStep cfg={cfg} upd={upd} />}
+          {step === "branding" && <BrandingStep cfg={cfg} upd={upd} />}
           {step === "repos" && <ReposStep cfg={cfg} upd={upd} />}
           {step === "packages" && <PackagesStep cfg={cfg} upd={upd} />}
           {step === "output" && <OutputStep cfg={cfg} upd={upd} />}
