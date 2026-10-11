@@ -3,6 +3,7 @@ import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import { autologinFiles, serviceShellLines } from "./accounts";
+import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -91,6 +92,11 @@ ${pkgs}
 </image>
 `;
 
+  const net = staticNetwork(cfg);
+  const netFile: Record<string, string> = net
+    ? { "kiwi/root/etc/NetworkManager/system-connections/distroforge.nmconnection": nmConnection(net) }
+    : {};
+
   const shLines = [
     "#!/bin/bash",
     "set -euo pipefail",
@@ -114,6 +120,10 @@ ${pkgs}
     );
   if (wallpaperApplies(cfg) && dconfSchemaFor(cfg.desktop))
     shLines.push("dconf update || true");
+  if (net)
+    shLines.push(
+      "chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection"
+    );
   const configSh = shLines.join("\n") + "\n";
 
   const wallpaperFiles: Record<string, string> = {};
@@ -150,6 +160,7 @@ echo "Imagen lista en ./out"
     ...Object.fromEntries(
       Object.entries(autologinFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
     ),
+    ...netFile,
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

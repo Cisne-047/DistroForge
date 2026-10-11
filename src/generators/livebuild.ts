@@ -3,6 +3,7 @@ import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import { autologinFiles, extraUserShellLines, serviceShellLines } from "./accounts";
+import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -135,6 +136,20 @@ ${serviceShellLines(cfg).join("\n")}
 `
       : "";
 
+  const net = staticNetwork(cfg);
+  const netFiles: Record<string, string> = net
+    ? {
+        "livebuild/config/includes.chroot/etc/NetworkManager/system-connections/distroforge.nmconnection":
+          nmConnection(net),
+        // NM ignora keyfiles legibles por el mundo: 600 en el build
+        "livebuild/config/hooks/0330-distroforge-net.hooks.chroot": `#!/bin/sh
+set -e
+# DistroForge - permisos del keyfile de red
+chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection || true
+`,
+      }
+    : {};
+
   const wallpaperFiles: Record<string, string> = {};
   if (wallpaperApplies(cfg)) {
     const wf = wallpaperFileName(cfg)!;
@@ -177,6 +192,7 @@ ${serviceShellLines(cfg).join("\n")}
     ...(servicesHook
       ? { "livebuild/config/hooks/0340-services.hooks.chroot": servicesHook }
       : {}),
+    ...netFiles,
     ...(flatpakHook ? { "livebuild/config/hooks/0350-flatpak.hooks.chroot": flatpakHook } : {}),
     ...wallpaperFiles,
     "build.sh": buildSh,

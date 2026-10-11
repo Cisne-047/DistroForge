@@ -446,6 +446,7 @@ export function defaultConfig(base: BaseId): DistroConfig {
     extraFiles: [],
     users: [],
     services: [],
+    network: { mode: "dhcp", ip: "", prefix: "24", gateway: "", dns: [] },
     autologin: false,
     cloudInit: false,
     motd: "Bienvenido a tu distro personalizada (DistroForge)",

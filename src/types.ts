@@ -54,6 +54,18 @@ export interface ServiceToggle {
   enabled: boolean;
 }
 
+/** Configuración de red (pestaña General de SUSE Studio). */
+export interface NetworkConfig {
+  mode: "dhcp" | "static";
+  /** IPv4 (solo en modo estático) */
+  ip: string;
+  /** prefijo CIDR 8-32, como texto */
+  prefix: string;
+  gateway: string;
+  /** servidores DNS IPv4 */
+  dns: string[];
+}
+
 export interface DistroConfig {
   name: string;
   base: BaseId;
@@ -70,6 +82,8 @@ export interface DistroConfig {
   users: ExtraUser[];
   /** servicios systemd a habilitar/deshabilitar */
   services: ServiceToggle[];
+  /** red: DHCP (por defecto) o IP estática */
+  network: NetworkConfig;
   /** auto-login del usuario principal en el escritorio */
   autologin: boolean;
   /** inyectar cloud-init (NoCloud) para VMs/cloud */

@@ -605,3 +605,63 @@ describe("bloque 6: paridad SUSE Studio (usuarios, servicios, autologin, formato
     }
   });
 });
+
+describe("bloque 7: red estática", () => {
+  const netCfg = (base: BaseId): DistroConfig => {
+    const c = cfgFor(base);
+    c.network = {
+      mode: "static",
+      ip: "192.168.1.50",
+      prefix: "24",
+      gateway: "192.168.1.1",
+      dns: ["1.1.1.1", "8.8.8.8"],
+    };
+    return c;
+  };
+
+  it("kickstart: línea network estática con máscara dotted; dhcp por defecto", () => {
+    const ks = generateProject(netCfg("fedora"))["fedora/ks.cfg"];
+    expect(ks).toContain(
+      "network --bootproto=static --ip=192.168.1.50 --netmask=255.255.255.0 --gateway=192.168.1.1 --nameserver=1.1.1.1,8.8.8.8"
+    );
+    expect(generateProject(cfgFor("fedora"))["fedora/ks.cfg"]).toContain("--bootproto=dhcp");
+  });
+
+  it("live-build: keyfile NM con chmod 600 en build; sin rastro en DHCP", () => {
+    const files = generateProject(netCfg("debian"));
+    const keyfile =
+      files["livebuild/config/includes.chroot/etc/NetworkManager/system-connections/distroforge.nmconnection"];
+    expect(keyfile).toContain("address1=192.168.1.50/24,192.168.1.1");
+    expect(keyfile).toContain("dns=1.1.1.1;8.8.8.8;");
+    expect(Object.keys(files).some((p) => p.includes("0330-distroforge-net"))).toBe(true);
+    expect(
+      Object.keys(generateProject(cfgFor("debian"))).filter((p) => p.includes("nmconnection"))
+    ).toEqual([]);
+  });
+
+  it("KIWI: keyfile en root overlay y chmod en config.sh", () => {
+    const files = generateProject(netCfg("opensuse-tumbleweed"));
+    expect(
+      files["kiwi/root/etc/NetworkManager/system-connections/distroforge.nmconnection"]
+    ).toContain("address1=192.168.1.50/24,192.168.1.1");
+    expect(files["kiwi/config.sh"]).toContain(
+      "chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection"
+    );
+  });
+
+  it("validate: IP, prefijo, gateway y DNS inválidos; aviso Arch", () => {
+    const c = netCfg("debian");
+    c.network.ip = "999.1.1.1";
+    expect(validate(c).some((i) => i.includes("IP estática"))).toBe(true);
+    c.network.ip = "192.168.1.50";
+    c.network.prefix = "7";
+    expect(validate(c).some((i) => i.includes("prefijo"))).toBe(true);
+    c.network.prefix = "24";
+    c.network.dns = ["no-es-ip"];
+    expect(validate(c).some((i) => i.includes("DNS"))).toBe(true);
+    c.network.dns = ["1.1.1.1"];
+    expect(validate(c)).toEqual([]);
+    const a = netCfg("arch");
+    expect(validate(a).some((i) => i.includes("ISO live"))).toBe(true);
+  });
+});

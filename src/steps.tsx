@@ -57,6 +57,8 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
 export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const s = cfg.system;
   const setS = (patch: Partial<SystemConfig>) => upd({ system: { ...s, ...patch } });
+  const n = cfg.network ?? { mode: "dhcp" as const, ip: "", prefix: "24", gateway: "", dns: [] };
+  const setNet = (patch: Partial<typeof n>) => upd({ network: { ...n, ...patch } });
   const extras = cfg.extraFiles ?? [];
   const setExtra = (i: number, patch: Partial<ExtraFile>) =>
     upd({ extraFiles: extras.map((f, j) => (j === i ? { ...f, ...patch } : f)) });
@@ -107,6 +109,54 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             ))}
           </select>
         </label>
+        <label className="field">
+          Red
+          <select
+            value={n.mode}
+            onChange={(e) => setNet({ mode: e.target.value as "dhcp" | "static" })}
+          >
+            <option value="dhcp">DHCP (automática)</option>
+            <option value="static">IP estática</option>
+          </select>
+        </label>
+        {n.mode === "static" && (
+          <>
+            <label className="field">
+              IP
+              <input
+                value={n.ip}
+                placeholder="192.168.1.50"
+                onChange={(e) => setNet({ ip: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              Prefijo CIDR
+              <input
+                value={n.prefix}
+                placeholder="24"
+                onChange={(e) => setNet({ prefix: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              Gateway
+              <input
+                value={n.gateway}
+                placeholder="192.168.1.1"
+                onChange={(e) => setNet({ gateway: e.target.value })}
+              />
+            </label>
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
+              DNS (separados por comas; no aplica en la ISO de Arch)
+              <input
+                value={(n.dns ?? []).join(", ")}
+                placeholder="1.1.1.1, 8.8.8.8"
+                onChange={(e) =>
+                  setNet({ dns: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })
+                }
+              />
+            </label>
+          </>
+        )}
         <label className="field" style={{ gridColumn: "1 / -1" }}>
           Mensaje MOTD (/etc/motd)
           <textarea

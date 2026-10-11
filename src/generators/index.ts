@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import type { DistroConfig } from "../types";
 import { baseById, effectiveRepos } from "../catalog";
+import { IPV4_RE } from "./network";
 import { kiwiFiles } from "./kiwi";
 import { livebuildFiles } from "./livebuild";
 import { archisoFiles } from "./archiso";
@@ -93,6 +94,20 @@ export function validate(cfg: DistroConfig): string[] {
     if (!/^[A-Za-z0-9@._-]+$/.test(s.unit))
       out.push(`Servicio #${i + 1}: nombre de unidad inválido (ej. sshd.service).`);
   });
+  if (cfg.network && cfg.network.mode === "static") {
+    const n = cfg.network;
+    if (!IPV4_RE.test(n.ip)) out.push("Red: IP estática inválida.");
+    if (!(Number(n.prefix) >= 8 && Number(n.prefix) <= 32))
+      out.push("Red: prefijo CIDR inválido (8-32).");
+    if (!IPV4_RE.test(n.gateway)) out.push("Red: gateway inválido.");
+    const dns = (n.dns ?? []).filter(Boolean);
+    if (!dns.length || dns.some((d) => !IPV4_RE.test(d)))
+      out.push("Red: falta al menos un servidor DNS válido (IPv4).");
+    if (baseById(cfg.base).engine === "mkarchiso")
+      out.push(
+        "Arch: la red estática no se aplica en la ISO live (NetworkManager hace DHCP al arrancar)."
+      );
+  }
   cfg.repos.forEach((r, i) => {
     if (!r.url) {
       if (r.alias || r.gpgKey) out.push(`Repo #${i + 1}: falta la URL.`);

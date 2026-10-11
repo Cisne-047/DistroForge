@@ -3,6 +3,7 @@ import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
 import { autologinFiles, serviceShellLines } from "./accounts";
+import { dottedMask, staticNetwork } from "./network";
 
 export function dirnameOf(p: string): string {
   const d = p.replace(/\/[^/]*$/, "");
@@ -53,11 +54,16 @@ ${postLines.join("\n")}
 %end
 `;
 
+  const net = staticNetwork(cfg);
+  const netLine = net
+    ? `network --bootproto=static --ip=${net.ip} --netmask=${dottedMask(net.prefix)} --gateway=${net.gateway} --nameserver=${net.dns.join(",")} --hostname=${sys.hostname}`
+    : `network --bootproto=dhcp --hostname=${sys.hostname}`;
+
   const ks = `# DistroForge - kickstart Fedora
 lang ${sys.locale}
 keyboard --vckeymap=${sys.keyboard} --xlayouts='${sys.keyboard}'
 timezone ${sys.timezone} --utc
-network --bootproto=dhcp --hostname=${sys.hostname}
+${netLine}
 rootpw --lock
 user --name=${sys.username} --password=${sys.password} --plaintext --groups=wheel
 ${(cfg.users ?? [])

@@ -185,6 +185,10 @@ export default function App() {
             <span>Host</span>
             <span>{cfg.system.hostname}</span>
           </div>
+          <div className="row">
+            <span>Red</span>
+            <span>{cfg.network?.mode === "static" ? "Estática" : "DHCP"}</span>
+          </div>
         </aside>
       </main>
     </div>
