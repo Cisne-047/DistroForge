@@ -419,3 +419,64 @@ describe("bloque 4: flatpak y ficheros extra", () => {
     );
   });
 });
+
+describe("bloque 5: claves GPG por motor", () => {
+  const keyedRepo = {
+    alias: "mirepo",
+    url: "https://example.com/r",
+    gpgKey: "https://example.com/key.asc",
+    suite: "main",
+    enabled: true,
+  };
+
+  it("KIWI: importa la key en config.sh cuando hay key; nada cuando no", () => {
+    const c = cfgFor("opensuse-tumbleweed");
+    c.repos = [keyedRepo];
+    expect(generateProject(c)["kiwi/config.sh"]).toContain(`rpm --import "${keyedRepo.gpgKey}"`);
+    const sin = cfgFor("opensuse-tumbleweed");
+    sin.repos = [{ ...keyedRepo, gpgKey: "" }];
+    const sh = generateProject(sin)["kiwi/config.sh"];
+    expect(sh).not.toContain("rpm --import");
+  });
+
+  it("kickstart: siempre --nogpgcheck e importa la key en %post; aviso en validate", () => {
+    const c = cfgFor("fedora");
+    c.repos = [keyedRepo];
+    const ks = generateProject(c)["fedora/ks.cfg"];
+    expect(ks).toContain("--nogpgcheck");
+    expect(ks).toContain(`rpm --import "${keyedRepo.gpgKey}"`);
+    expect(validate(c).some((i) => i.includes("GPG"))).toBe(true);
+  });
+
+  it("OCI Debian: descarga la key y firma el repo con signed-by", () => {
+    const c = cfgFor("debian");
+    c.output = "oci";
+    c.repos = [keyedRepo];
+    const df = generateProject(c)["Dockerfile"];
+    expect(df).toContain(`wget -qO /usr/share/keyrings/mirepo.asc ${keyedRepo.gpgKey}`);
+    expect(df).toContain("deb [signed-by=/usr/share/keyrings/mirepo.asc] https://example.com/r main");
+  });
+
+  it("OCI Debian sin key: sigue trusted=yes", () => {
+    const c = cfgFor("debian");
+    c.output = "oci";
+    c.repos = [{ ...keyedRepo, gpgKey: "" }];
+    expect(generateProject(c)["Dockerfile"]).toContain("deb [trusted=yes] https://example.com/r main");
+  });
+
+  it("WSL Debian: key descargada al rootfs y repo firmado", () => {
+    const c = cfgFor("debian");
+    c.output = "wsl";
+    c.repos = [keyedRepo];
+    const sh = generateProject(c)["wsl/rootfs.sh"];
+    expect(sh).toContain(`wget -qO /rootfs/usr/share/keyrings/mirepo.asc ${keyedRepo.gpgKey}`);
+    expect(sh).toContain("deb [signed-by=/usr/share/keyrings/mirepo.asc] https://example.com/r main");
+    expect(sh).toContain("apt-get install -y debootstrap wget ca-certificates");
+  });
+
+  it("validate: avisa de TrustAll en Arch con key GPG", () => {
+    const c = cfgFor("arch");
+    c.repos = [keyedRepo];
+    expect(validate(c).some((i) => i.includes("TrustAll"))).toBe(true);
+  });
+});

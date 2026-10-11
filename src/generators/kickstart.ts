@@ -23,14 +23,14 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
   const repos = effectiveRepos(cfg);
 
   const repoLines = repos
-    .map(
-      (r) =>
-        `repo --name="${r.alias}" --baseurl="${r.url}"${r.gpgKey ? "" : " --nogpgcheck"}`
-    )
+    .map((r) => `repo --name="${r.alias}" --baseurl="${r.url}" --nogpgcheck`)
     .join("\n");
 
   const postLines = [
     'echo "DistroForge" > /etc/distroforge-release',
+    // instalación sin verificación (anaconda no puede preguntar), pero el sistema
+    // final queda confiando en las keys para futuras actualizaciones
+    ...repos.filter((r) => r.gpgKey).map((r) => `rpm --import "${r.gpgKey}"`),
     ...(cfg.motd ? ["cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF"] : []),
     ...(cfg.cloudInit
       ? [

@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
 import { dirnameOf } from "./kickstart";
+import { sanitizeAlias } from "./livebuild";
 
 function sq(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -47,18 +48,27 @@ export function wslFiles(cfg: DistroConfig): Record<string, string> {
   if (engine === "livebuild") {
     const distro = base.distribution ?? "bookworm";
     const mirror = base.mirror || "http://deb.debian.org/debian";
+    const needKey = repos.some((r) => r.gpgKey);
+    const ensureBootstrap = needKey
+      ? "apt-get update\napt-get install -y debootstrap wget ca-certificates"
+      : 'command -v debootstrap >/dev/null || { apt-get update; apt-get install -y debootstrap; }';
     const repoLines = repos
-      .map((r) => {
-        const src = r.suite
-          ? `deb [trusted=yes] ${r.url} ${r.suite}`
-          : `deb [trusted=yes] ${r.url} ./`;
-        return `cat > /rootfs/etc/apt/sources.list.d/distroforge-${r.alias || "custom"}.list <<'EOF'\n${src}\nEOF`;
+      .map((r, i) => {
+        const alias = sanitizeAlias(r.alias, i);
+        const signed = r.gpgKey
+          ? `[signed-by=/usr/share/keyrings/${alias}.asc]`
+          : "[trusted=yes]";
+        const src = r.suite ? `deb ${signed} ${r.url} ${r.suite}` : `deb ${signed} ${r.url} ./`;
+        const keyLine = r.gpgKey
+          ? `mkdir -p /rootfs/usr/share/keyrings\nwget -qO /rootfs/usr/share/keyrings/${alias}.asc ${r.gpgKey}\n`
+          : "";
+        return `${keyLine}cat > /rootfs/etc/apt/sources.list.d/distroforge-${alias}.list <<'EOF'\n${src}\nEOF`;
       })
       .join("\n");
     script = `#!/usr/bin/env bash
 set -euxo pipefail
 # DistroForge - rootfs WSL para ${base.label} (debootstrap)
-command -v debootstrap >/dev/null || { apt-get update; apt-get install -y debootstrap; }
+${ensureBootstrap}
 rm -rf /rootfs && mkdir -p /rootfs
 debootstrap --variant=minbase ${distro} /rootfs ${mirror}
 ${repoLines}

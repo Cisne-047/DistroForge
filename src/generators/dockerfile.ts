@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { flatpakPackages, hasFlatpakApps } from "./flatpak";
 import { dirnameOf } from "./kickstart";
+import { sanitizeAlias } from "./livebuild";
 
 /** Imagen base OCI para cada distro (salida "oci"). */
 const BASE_IMAGE: Record<string, string> = {
@@ -41,16 +42,29 @@ export function dockerfileFiles(cfg: DistroConfig): Record<string, string> {
 
   let run: string;
   if (engine === "livebuild") {
+    const keyLines = repos
+      .map((r, i) =>
+        r.gpgKey
+          ? `    mkdir -p /usr/share/keyrings; \\
+    wget -qO /usr/share/keyrings/${sanitizeAlias(r.alias, i)}.asc ${r.gpgKey}; \\`
+          : ""
+      )
+      .filter(Boolean)
+      .join("\n");
     const repoLines = repos
-      .map((r) => {
-        const src = r.suite
-          ? `deb [trusted=yes] ${r.url} ${r.suite}`
-          : `deb [trusted=yes] ${r.url} ./`;
-        return `    echo ${sq(src)} > /etc/apt/sources.list.d/distroforge-${r.alias || "custom"}.list; \\`;
+      .map((r, i) => {
+        const alias = sanitizeAlias(r.alias, i);
+        const signed = r.gpgKey
+          ? `[signed-by=/usr/share/keyrings/${alias}.asc]`
+          : "[trusted=yes]";
+        const src = r.suite ? `deb ${signed} ${r.url} ${r.suite}` : `deb ${signed} ${r.url} ./`;
+        return `    echo ${sq(src)} > /etc/apt/sources.list.d/distroforge-${alias}.list; \\`;
       })
       .join("\n");
     run = `RUN set -eux; \\
-${repoLines ? repoLines + "\n" : ""}    apt-get update; \\
+    apt-get update; \\
+    apt-get install -y --no-install-recommends wget ca-certificates; \\
+${keyLines ? keyLines + "\n" : ""}${repoLines ? repoLines + "\n" : ""}    apt-get update; \\
     apt-get install -y --no-install-recommends ${["sudo", ...pkgs].join(" ")}; \\
     apt-get clean; \\
     rm -rf /var/lib/apt/lists/*; \\

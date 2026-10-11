@@ -74,6 +74,12 @@ export function validate(cfg: DistroConfig): string[] {
         out.push(`Fichero extra #${i + 1}: la ruta no puede contener "..".`);
     });
   }
+  if (baseById(cfg.base).engine === "kickstart" && cfg.repos.some((r) => r.gpgKey))
+    out.push(
+      "Fedora: los repos custom se instalan sin verificación GPG (anaconda no puede preguntar); la key se importa para el sistema final."
+    );
+  if (baseById(cfg.base).engine === "mkarchiso" && cfg.repos.some((r) => r.gpgKey))
+    out.push("Arch: los repos custom van con TrustAll; la key GPG no se usa.");
   cfg.repos.forEach((r, i) => {
     if (!r.url) {
       if (r.alias || r.gpgKey) out.push(`Repo #${i + 1}: falta la URL.`);

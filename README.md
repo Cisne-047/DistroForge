@@ -9,10 +9,14 @@ Todo corre en el navegador — no hay backend, no hay cuentas, la configuración
 - **14 bases**: openSUSE (Tumbleweed/Leap), familia Debian (Debian, Ubuntu, Mint, elementary, Pop!_OS, Zorin), familia Arch (Arch, Manjaro, CachyOS), Fedora, Gentoo y Solus.
 - **4 motores de ISO** según familia: KIWI NG (openSUSE), live-build (Debian), mkarchiso (Arch) y kickstart + livemedia-creator (Fedora). Gentoo/Solus generan guía manual.
 - **4 salidas**: ISO (los 4 motores), QCOW2 (KIWI), **OCI/Docker** (Dockerfile + CI con `docker build`/`docker save`, sin `--privileged`) y **WSL** (rootfs tar importable con `wsl --import`).
-- **Extras**: hasta 10 escritorios, repos custom con suite/GPG, cloud-init NoCloud opcional, MOTD editable, wallpaper aplicado vía dconf/xfconf, apps Flatpak, ficheros extra (dotfiles) por ruta absoluta.
+- **Extras**: hasta 10 escritorios, repos custom con suite/GPG (la key se importa de verdad en apt, zypper y dnf), cloud-init NoCloud opcional, MOTD editable, wallpaper aplicado vía dconf/xfconf, apps Flatpak, ficheros extra (dotfiles) por ruta absoluta.
 - **CI incluido en cada proyecto**: el zip trae `.github/workflows/build.yml` que construye la imagen en GitHub Actions y la sube como artefacto. Un lint propio (test `parsea el YAML de CI...`) valida todas las combinaciones base × salida.
 
 ## Uso
+
+**Online:** la app está desplegada en **https://cisne-047.github.io/DistroForge/** (deploy automático con cada push).
+
+**Local:**
 
 ```bash
 npm install

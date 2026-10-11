@@ -86,6 +86,10 @@ ${pkgs}
     "# DistroForge - configuracion post-instalacion (se ejecuta en chroot)",
     `systemctl set-default ${withDesktop ? "graphical" : "multi-user"}.target`,
     `echo "${sys.username} ALL=(ALL) ALL" > /etc/sudoers.d/50-${sys.username}`,
+    // las keys de repos custom entran al keyring antes de que zypper las verifique
+    ...effectiveRepos(cfg)
+      .filter((r) => r.gpgKey)
+      .map((r) => `rpm --import "${r.gpgKey}"`),
   ];
   if (cfg.motd) shLines.push("cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF");
   if (hasFlatpakApps(cfg)) shLines.push(...flatpakShellLines(cfg));
