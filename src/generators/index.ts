@@ -129,6 +129,7 @@ export function validate(cfg: DistroConfig): string[] {
       cfg.autologin && "auto-login",
       cfg.network?.mode === "static" && "red estática",
       (cfg.services?.length ?? 0) > 0 && "servicios systemd",
+      (cfg.autostart?.length ?? 0) > 0 && "autostart",
     ].filter(Boolean);
     if (dropped.length)
       out.push(

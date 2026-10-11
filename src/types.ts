@@ -113,6 +113,12 @@ export interface DistroConfig {
   customIso: CustomIsoConfig;
   /** auto-login del usuario principal en el escritorio */
   autologin: boolean;
+  /** programas que arrancan al iniciar sesión (entradas .desktop) */
+  autostart: string[];
+  /** puertos/servicios abiertos en el firewall (ej. "ssh", "8080/tcp") */
+  firewallPorts: string[];
+  /** target de arranque: auto (según escritorio), gráfico o texto */
+  bootTarget: "auto" | "graphical" | "text";
   /** inyectar cloud-init (NoCloud) para VMs/cloud */
   cloudInit: boolean;
   /** mensaje del día (/etc/motd) */

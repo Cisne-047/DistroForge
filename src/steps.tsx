@@ -229,6 +229,49 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           />
           Firewall habilitado (firewalld; en Fedora lo gestiona el kickstart)
         </label>
+        <label className="field" style={{ gridColumn: "1 / -1" }}>
+          Puertos/servicios abiertos en el firewall (separados por comas: ssh, http, 8080/tcp)
+          <input
+            value={(cfg.firewallPorts ?? []).join(", ")}
+            placeholder="ssh, 8080/tcp"
+            onChange={(e) =>
+              upd({
+                firewallPorts: e.target.value
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+              })
+            }
+          />
+        </label>
+        <label className="field">
+          Target de arranque
+          <select
+            value={cfg.bootTarget ?? "auto"}
+            onChange={(e) =>
+              upd({ bootTarget: e.target.value as "auto" | "graphical" | "text" })
+            }
+          >
+            <option value="auto">Auto (según escritorio)</option>
+            <option value="graphical">Gráfico</option>
+            <option value="text">Texto (multi-user)</option>
+          </select>
+        </label>
+        <label className="field">
+          Autostart (programas al iniciar sesión, separados por comas)
+          <input
+            value={(cfg.autostart ?? []).join(", ")}
+            placeholder="firefox, konsole"
+            onChange={(e) =>
+              upd({
+                autostart: e.target.value
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+              })
+            }
+          />
+        </label>
         <label className="chk" style={{ gridColumn: "1 / -1" }}>
           <input
             type="checkbox"
@@ -814,6 +857,20 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           }}
         />
       </p>
+      {(cfg.output === "iso" || (b.engine === "kiwi" && cfg.output !== "oci" && cfg.output !== "wsl")) && !cfg.advanced && (
+        <div className="warnings" style={{ borderColor: "var(--acc-2)" }}>
+          <strong>Test Drive local (QEMU):</strong>
+          <pre style={{ margin: "6px 0 0", overflow: "auto", fontFamily: "inherit" }}>
+{cfg.output === "iso"
+  ? `qemu-system-x86_64 -enable-kvm -m 2048 -cdrom <ruta del .iso>`
+  : `qemu-system-x86_64 -enable-kvm -m 2048 -drive file=<ruta>,format=${cfg.output === "usb" ? "raw" : cfg.output === "qcow2" ? "qcow2" : cfg.output}`}
+          </pre>
+          <span style={{ color: "var(--dim)", fontSize: 12 }}>
+            Requiere QEMU instalado (sudo apt/dnf/pacman install qemu). Para arm64 usa
+            qemu-system-aarch64 con UEFI.
+          </span>
+        </div>
+      )}
       <p className="hint">
         El zip incluye la receta, build.sh (Podman en Linux/WSL2), un workflow de GitHub
         Actions para construir la imagen y <code>distroforge.json</code> (reimportable en la

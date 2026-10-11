@@ -813,3 +813,31 @@ describe("bloques 8-11: firewall, share, plantillas, arch, grub, advanced", () =
     }
   });
 });
+
+describe("bloque 12b: autostart, puertos firewall y target de arranque", () => {
+  it("live-build: autostart .desktop, firewall-cmd y set-default", () => {
+    const c = cfgFor("debian");
+    c.autostart = ["firefox", "konsole"];
+    c.firewallPorts = ["ssh", "8080/tcp"];
+    c.bootTarget = "text";
+    const f = generateProject(c);
+    expect(Object.keys(f).some((p) => p.includes("/.config/autostart/") && p.includes("firefox"))).toBe(true);
+    const hook = f["livebuild/config/hooks/0340-services.hooks.chroot"];
+    expect(hook).toContain("firewall-cmd --permanent --add-service=ssh");
+    expect(hook).toContain("firewall-cmd --permanent --add-port=8080/tcp");
+    expect(hook).toContain("systemctl set-default multi-user.target");
+  });
+
+  it("kickstart: --port/--service del firewall; archiso: set-default gráfico", () => {
+    const k = cfgFor("fedora");
+    k.firewallPorts = ["ssh", "8080/tcp"];
+    expect(generateProject(k)["fedora/ks.cfg"]).toContain(
+      "firewall --enabled --service=ssh --port=8080/tcp"
+    );
+    const a = cfgFor("arch");
+    a.bootTarget = "graphical";
+    expect(
+      generateProject(a)["archiso/airootfs/etc/systemd/system/distroforge-services.service"]
+    ).toContain("set-default graphical.target");
+  });
+});

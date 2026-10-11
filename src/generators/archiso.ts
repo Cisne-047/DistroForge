@@ -5,8 +5,10 @@ import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakApps, flatpakPackages, FLATHUB, hasFlatpakApps } from "./flatpak";
 import {
   autologinFiles,
+  autostartFiles,
   firewallExecStart,
   serviceExecStartLines,
+  targetShellLine,
   userExecStartLines,
 } from "./accounts";
 import {
@@ -118,7 +120,17 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 `;
-  const svcExecs = [...serviceExecStartLines(cfg), firewallExecStart(cfg)];
+  const svcExecs = [
+    `ExecStart=/bin/sh -c '${targetShellLine(cfg)} || true'`,
+    ...serviceExecStartLines(cfg),
+    firewallExecStart(cfg),
+    ...(cfg.firewallPorts ?? [])
+      .filter((x) => /^[A-Za-z0-9._-]+(\/\d+(\/(tcp|udp))?)?$/.test(x))
+      .map(
+        (x) =>
+          `ExecStart=/bin/sh -c 'firewall-cmd --permanent --${x.includes("/") ? "add-port" : "add-service"}=${x} || firewall-cmd --${x.includes("/") ? "add-port" : "add-service"}=${x} || true'`
+      ),
+  ];
   if (svcExecs.length)
     accountFiles["archiso/airootfs/etc/systemd/system/distroforge-services.service"] = `[Unit]
 Description=DistroForge - habilita/deshabilita servicios
@@ -145,6 +157,8 @@ WantedBy=multi-user.target
         `L /etc/systemd/system/multi-user.target.wants/${name}.service - - - - /etc/systemd/system/${name}.service\n`;
   }
   for (const [p, c] of Object.entries(autologinFiles(cfg)))
+    accountFiles[`archiso/airootfs${p}`] = c;
+  for (const [p, c] of Object.entries(autostartFiles(cfg)))
     accountFiles[`archiso/airootfs${p}`] = c;
 
   if (wallpaperApplies(cfg)) {

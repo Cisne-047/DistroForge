@@ -2,7 +2,14 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
-import { autologinFiles, firewallServiceLine, serviceShellLines } from "./accounts";
+import {
+  autologinFiles,
+  autostartFiles,
+  firewallOpenLines,
+  firewallServiceLine,
+  serviceShellLines,
+  targetShellLine,
+} from "./accounts";
 import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
@@ -25,7 +32,6 @@ function esc(s: string): string {
 export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
   const base = baseById(cfg.base);
   const sys = cfg.system;
-  const withDesktop = desktopPackages(cfg.base, cfg.desktop).length > 0;
   const grubParams = (cfg.grub?.extraParams ?? "").replace(/["`$]/g, "").trim();
   const kernAttr = grubParams ? ` kernelcmdline="${esc(grubParams)}"` : "";
   const typeTag =
@@ -105,13 +111,13 @@ ${pkgs}
     "#!/bin/bash",
     "set -euo pipefail",
     "# DistroForge - configuracion post-instalacion (se ejecuta en chroot)",
-    `systemctl set-default ${withDesktop ? "graphical" : "multi-user"}.target`,
+    targetShellLine(cfg),
     `echo "${sys.username} ALL=(ALL) ALL" > /etc/sudoers.d/50-${sys.username}`,
     // las keys de repos custom entran al keyring antes de que zypper las verifique
     ...effectiveRepos(cfg)
       .filter((r) => r.gpgKey)
       .map((r) => `rpm --import "${r.gpgKey}"`),
-    ...[firewallServiceLine(cfg), ...serviceShellLines(cfg)],
+    ...[firewallServiceLine(cfg), ...firewallOpenLines(cfg), ...serviceShellLines(cfg)],
   ];
   if (cfg.motd) shLines.push("cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF");
   if (hasFlatpakApps(cfg)) shLines.push(...flatpakShellLines(cfg));
@@ -163,6 +169,9 @@ echo "Imagen lista en ./out"
     ),
     ...Object.fromEntries(
       Object.entries(autologinFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
+    ),
+    ...Object.fromEntries(
+      Object.entries(autostartFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
     ),
     ...netFile,
     ...wallpaperFiles,

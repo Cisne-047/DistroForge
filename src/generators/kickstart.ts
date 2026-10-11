@@ -3,7 +3,7 @@ import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
 import { sanitizeAlias } from "./livebuild";
-import { autologinFiles, serviceShellLines } from "./accounts";
+import { autologinFiles, autostartFiles, serviceShellLines, targetShellLine } from "./accounts";
 import { dottedMask, staticNetwork } from "./network";
 import { dirnameOf } from "./shell";
 
@@ -40,6 +40,10 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
         ]
       : []),
     ...extraFilePostLines(cfg.extraFiles),
+    ...extraFilePostLines(
+      Object.entries(autostartFiles(cfg)).map(([path, content]) => ({ path, content }))
+    ),
+    targetShellLine(cfg),
     ...Object.entries(autologinFiles(cfg)).flatMap(([path, content]) =>
       extraFilePostLines([{ path, content }])
     ),
@@ -72,7 +76,7 @@ ${(cfg.users ?? [])
   )
   .join("\n")}
 firstboot --disable
-firewall ${cfg.firewall ? "--enabled" : "--disabled"}
+firewall ${cfg.firewall ? `--enabled${(cfg.firewallPorts ?? []).map((x) => (x.includes("/") ? ` --port=${x}` : ` --service=${x}`)).join("")}` : "--disabled"}
 bootloader --location=mbr --timeout=${cfg.grub?.timeout ?? 10}${grubAppend ? ` --append="${grubAppend}"` : ""}
 zerombr
 clearpart --all --initlabel

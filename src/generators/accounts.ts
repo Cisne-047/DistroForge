@@ -65,6 +65,48 @@ export function serviceExecStartLines(cfg: DistroConfig): string[] {
     );
 }
 
+/** Target systemd de arranque: respetando la elección del usuario y el escritorio. */
+export function defaultTarget(cfg: DistroConfig): "graphical" | "multi-user" {
+  if (cfg.bootTarget === "text") return "multi-user";
+  const hasDesktop = desktopPackages(cfg.base, cfg.desktop).length > 0;
+  if (cfg.bootTarget === "graphical") return "graphical";
+  return hasDesktop ? "graphical" : "multi-user";
+}
+
+/** Línea systemctl set-default correspondiente. */
+export function targetShellLine(cfg: DistroConfig): string {
+  return `systemctl set-default ${defaultTarget(cfg)}.target`;
+}
+
+/** Líneas firewalld para abrir los puertos/servicios elegidos. */
+export function firewallOpenLines(cfg: DistroConfig): string[] {
+  return (cfg.firewallPorts ?? [])
+    .filter((x) => /^[A-Za-z0-9._-]+(\/\d+(\/(tcp|udp))?)?$/.test(x))
+    .map((x) =>
+      x.includes("/")
+        ? `firewall-cmd --permanent --add-port=${x} || true`
+        : `firewall-cmd --permanent --add-service=${x} || true`
+    );
+}
+
+/** Entradas .desktop de autostart para el usuario principal: ruta → contenido. */
+export function autostartFiles(cfg: DistroConfig): Record<string, string> {
+  const u = cfg.system.username;
+  const out: Record<string, string> = {};
+  (cfg.autostart ?? []).forEach((prog, i) => {
+    const name = prog.replace(/["'\/\$`]/g, "").trim();
+    if (!name) return;
+    out[`/home/${u}/.config/autostart/10-distroforge-${i}-${name.replace(/[^a-zA-Z0-9._-]/g, "_")}.desktop`] =
+      `[Desktop Entry]
+Type=Application
+Name=${name}
+Exec=${name}
+X-GNOME-Autostart-enabled=true
+`;
+  });
+  return out;
+}
+
 function dmOf(cfg: DistroConfig): string | null {
   const pkgs = [...desktopPackages(cfg.base, cfg.desktop)];
   if (pkgs.includes("sddm")) return "sddm";

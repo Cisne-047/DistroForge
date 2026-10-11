@@ -2,7 +2,15 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, DEB_ARCH, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
-import { autologinFiles, extraUserShellLines, firewallServiceLine, serviceShellLines } from "./accounts";
+import {
+  autologinFiles,
+  autostartFiles,
+  extraUserShellLines,
+  firewallOpenLines,
+  firewallServiceLine,
+  serviceShellLines,
+  targetShellLine,
+} from "./accounts";
 import { dq, sq } from "./shell";
 import { nmConnection, staticNetwork } from "./network";
 import {
@@ -129,7 +137,7 @@ ${flatpakShellLines(cfg).join("\n")}
   const servicesHook = `#!/bin/sh
 set -e
 # DistroForge - firewall y servicios systemd
-${[firewallServiceLine(cfg), ...serviceShellLines(cfg)].join("\n")}
+${[targetShellLine(cfg), firewallServiceLine(cfg), ...firewallOpenLines(cfg), ...serviceShellLines(cfg)].join("\n")}
 `;
 
   const net = staticNetwork(cfg);
@@ -181,6 +189,12 @@ chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection || tru
     ),
     ...Object.fromEntries(
       Object.entries(autologinFiles(cfg)).map(([p, c]) => [
+        `livebuild/config/includes.chroot${p}`,
+        c,
+      ])
+    ),
+    ...Object.fromEntries(
+      Object.entries(autostartFiles(cfg)).map(([p, c]) => [
         `livebuild/config/includes.chroot${p}`,
         c,
       ])
