@@ -132,7 +132,7 @@ fn valid_flatpak_id(s: &str) -> bool {
 /// 8-32, replicando `Number(n.prefix) >= 8 && Number(n.prefix) <= 32`.
 fn prefix_in_range(prefix: &str) -> bool {
     match prefix.trim().parse::<f64>() {
-        Ok(v) => v >= 8.0 && v <= 32.0,
+        Ok(v) => (8.0..=32.0).contains(&v),
         Err(_) => false,
     }
 }

@@ -46,7 +46,7 @@ fn b64_decode(s: &str) -> Option<Vec<u8>> {
     // Longitud tras padding no puede dejar resto 1 ("A===" es inválido, igual
     // que en atob).
     let data_len = bytes.iter().take_while(|&&c| c != b'=').count();
-    if bytes.len() % 4 != 0 || bytes.len() - data_len > 3 {
+    if !bytes.len().is_multiple_of(4) || bytes.len() - data_len > 3 {
         return None;
     }
     if bytes[data_len..].iter().any(|&c| c != b'=') {
@@ -114,7 +114,7 @@ pub fn decode_config(hash: &str) -> Option<DistroConfig> {
     let b64 = hash.replace('-', "+").replace('_', "/");
     // while (b64.length % 4) b64 += "="
     let mut b64 = b64;
-    while b64.len() % 4 != 0 {
+    while !b64.len().is_multiple_of(4) {
         b64.push('=');
     }
     let bytes = b64_decode(&b64)?;
