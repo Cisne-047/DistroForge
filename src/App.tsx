@@ -158,6 +158,14 @@ export default function App() {
             <span>{cfg.packages.length}</span>
           </div>
           <div className="row">
+            <span>Flatpak</span>
+            <span>{(cfg.flatpakApps ?? []).length}</span>
+          </div>
+          <div className="row">
+            <span>Ficheros extra</span>
+            <span>{(cfg.extraFiles ?? []).length}</span>
+          </div>
+          <div className="row">
             <span>Repos custom</span>
             <span>{activeRepos}</span>
           </div>

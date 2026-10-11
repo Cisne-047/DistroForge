@@ -1,6 +1,22 @@
 import type { DistroConfig } from "../types";
 import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
+import { flatpakPackages, flatpakShellLines } from "./flatpak";
+
+export function dirnameOf(p: string): string {
+  const d = p.replace(/\/[^/]*$/, "");
+  return d || "/";
+}
+
+/** Bloque %post que vuelca cada fichero extra con heredoc (rutas absolutas). */
+export function extraFilePostLines(extraFiles: { path: string; content: string }[]): string[] {
+  return (extraFiles ?? []).flatMap((f) => [
+    `mkdir -p ${dirnameOf(f.path)}`,
+    `cat > ${f.path} <<'DFEOF'`,
+    f.content,
+    "DFEOF",
+  ]);
+}
 
 export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
   const sys = cfg.system;
@@ -24,6 +40,8 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
           "CIEOF",
         ]
       : []),
+    ...extraFilePostLines(cfg.extraFiles),
+    ...flatpakShellLines(cfg),
   ];
   const postBlock = `%post
 ${postLines.join("\n")}
@@ -47,7 +65,7 @@ url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$rele
 ${repoLines}
 %packages
 @core
-${[...desktopPackages(cfg.base, cfg.desktop), ...cfg.packages, ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : [])].join("\n")}
+${[...desktopPackages(cfg.base, cfg.desktop), ...flatpakPackages(cfg), ...cfg.packages, ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : [])].join("\n")}
 %end
 
 ${postBlock}`;

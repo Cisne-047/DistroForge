@@ -12,6 +12,16 @@ export function manualFiles(cfg: DistroConfig): Record<string, string> {
     : `1. Instala Solus y añade los paquetes con \`eopkg install\`.
 2. Para una ISO remasterizada, parte de la imagen oficial + chroot, o usa respin propio.`;
 
+  const extras = cfg.extraFiles ?? [];
+  const extrasSection = extras.length
+    ? `\n## Ficheros extra\n\nCopia estos ficheros a mano (rutas absolutas dentro del sistema):\n\n${extras
+        .map((f) => `- \`${f.path}\``)
+        .join("\n")}\n`
+    : "";
+  const flatpakSection = cfg.flatpakApps?.length
+    ? `\n## Flatpak\n\n    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo\n    flatpak install -y flathub ${cfg.flatpakApps.join(" ")}\n`
+    : "";
+
   const readme = `# ${cfg.name} — base ${base.label} (motor manual)
 
 ${base.label} no tiene un builder público de imágenes que DistroForge pueda lanzar en contenedor todavía. Este proyecto genera la **lista de paquetes** y notas para montarla a mano.
@@ -25,7 +35,7 @@ ${pkgs}
 ## Cómo montarlo
 
 ${howto}
-
+${extrasSection}${flatpakSection}
 ## Notas
 
 - Los nombres de paquete son orientativos: ajústalos al repositorio de la distro.

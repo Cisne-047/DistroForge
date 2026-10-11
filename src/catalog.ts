@@ -442,6 +442,8 @@ export function defaultConfig(base: BaseId): DistroConfig {
       keyboard: "es",
     },
     output: "iso",
+    flatpakApps: [],
+    extraFiles: [],
     cloudInit: false,
     motd: "Bienvenido a tu distro personalizada (DistroForge)",
     wallpaper: "",

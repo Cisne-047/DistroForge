@@ -1,6 +1,7 @@
 import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
+import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -95,6 +96,7 @@ ${debLine}
     "ca-certificates",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
     ...wallpaperPackages(cfg, "apt"),
+    ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
     ...cfg.packages,
   ].join("\n");
@@ -113,6 +115,14 @@ podman run --rm --privileged -v "$DIR":/project -w /project/livebuild ${containe
 '
 echo "ISO en ./livebuild/live-image-amd64.hybrid.iso"
 `;
+
+  const flatpakHook = hasFlatpakApps(cfg)
+    ? `#!/bin/sh
+set -e
+# DistroForge - flatpak: flathub + apps
+${flatpakShellLines(cfg).join("\n")}
+`
+    : "";
 
   const wallpaperFiles: Record<string, string> = {};
   if (wallpaperApplies(cfg)) {
@@ -144,6 +154,10 @@ echo "ISO en ./livebuild/live-image-amd64.hybrid.iso"
             cloudInitYaml(cfg),
         }
       : {}),
+    ...Object.fromEntries(
+      (cfg.extraFiles ?? []).map((f) => [`livebuild/config/includes.chroot${f.path}`, f.content])
+    ),
+    ...(flatpakHook ? { "livebuild/config/hooks/0350-flatpak.hooks.chroot": flatpakHook } : {}),
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

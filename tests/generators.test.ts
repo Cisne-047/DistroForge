@@ -322,4 +322,100 @@ describe("validate", () => {
       expect(validate(c), `base ${b.id}`).toEqual([]);
     }
   });
+
+  it("validación: rutas de ficheros extra y ids flatpak", () => {
+    const c = cfgFor("debian");
+    c.extraFiles = [{ path: "relative/file", content: "x" }];
+    expect(validate(c).some((i) => i.includes("absoluta"))).toBe(true);
+    c.extraFiles = [{ path: "/etc/../passwd", content: "x" }];
+    expect(validate(c).some((i) => i.includes(".."))).toBe(true);
+    c.extraFiles = [];
+    c.flatpakApps = ["mal id!"];
+    expect(validate(c).some((i) => i.includes("id de app"))).toBe(true);
+  });
+});
+
+describe("bloque 4: flatpak y ficheros extra", () => {
+  const appCfg = (base: BaseId): DistroConfig => {
+    const c = cfgFor(base);
+    c.flatpakApps = ["org.mozilla.firefox", "org.videolan.VLC"];
+    c.extraFiles = [
+      { path: "/etc/skel/.bashrc", content: "export EDITOR=vim\n" },
+      { path: "/etc/issue", content: "mi distro" },
+    ];
+    return c;
+  };
+
+  it("live-build: paquete flatpak, hook de flathub y ficheros en includes.chroot", () => {
+    const files = generateProject(appCfg("debian"));
+    expect(files["livebuild/config/package-lists/distroforge.list.chroot"]).toContain("flatpak");
+    const hook = files["livebuild/config/hooks/0350-flatpak.hooks.chroot"];
+    expect(hook).toContain("remote-add --if-not-exists flathub");
+    expect(hook).toContain("org.mozilla.firefox org.videolan.VLC");
+    expect(files["livebuild/config/includes.chroot/etc/skel/.bashrc"]).toContain("EDITOR=vim");
+    expect(files["livebuild/config/includes.chroot/etc/issue"]).toBe("mi distro");
+  });
+
+  it("archiso: flatpak en packages, servicio de primer arranque y ficheros en airootfs", () => {
+    const files = generateProject(appCfg("arch"));
+    expect(files["archiso/packages.x86_64"]).toContain("flatpak");
+    const svc = files["archiso/airootfs/etc/systemd/system/distroforge-flatpak.service"];
+    expect(svc).toContain("remote-add --if-not-exists flathub");
+    expect(svc).toContain("org.mozilla.firefox org.videolan.VLC");
+    expect(files["archiso/airootfs/etc/tmpfiles.d/distroforge-flatpak.conf"]).toContain(
+      "multi-user.target.wants"
+    );
+    expect(files["archiso/airootfs/etc/skel/.bashrc"]).toContain("EDITOR=vim");
+  });
+
+  it("KIWI: paquete en config.xml, líneas en config.sh y ficheros en root overlay", () => {
+    const files = generateProject(appCfg("opensuse-tumbleweed"));
+    expect(files["kiwi/config.xml"]).toContain('name="flatpak"');
+    expect(files["kiwi/config.sh"]).toContain("flatpak install");
+    expect(files["kiwi/root/etc/skel/.bashrc"]).toContain("EDITOR=vim");
+  });
+
+  it("kickstart: flatpak en %packages y ficheros por heredoc en %post", () => {
+    const ks = generateProject(appCfg("fedora"))["fedora/ks.cfg"];
+    expect(ks).toContain("flatpak");
+    expect(ks).toContain("mkdir -p /etc/skel");
+    expect(ks).toContain("cat > /etc/skel/.bashrc <<'DFEOF'");
+    expect(ks).toContain("export EDITOR=vim");
+  });
+
+  it("OCI: RUN de flathub y COPY de ficheros extra", () => {
+    const c = appCfg("debian");
+    c.output = "oci";
+    const files = generateProject(c);
+    expect(files["Dockerfile"]).toContain("flatpak remote-add --if-not-exists flathub");
+    expect(files["Dockerfile"]).toContain("RUN mkdir -p /etc/skel /etc");
+    expect(files["Dockerfile"]).toContain("COPY files/extra-0 /etc/skel/.bashrc");
+    expect(files["files/extra-0"]).toContain("EDITOR=vim");
+  });
+
+  it("WSL: ficheros por heredoc en /rootfs y flatpak por chroot", () => {
+    const c = appCfg("ubuntu");
+    c.output = "wsl";
+    const sh = generateProject(c)["wsl/rootfs.sh"];
+    expect(sh).toContain("cat > /rootfs/etc/skel/.bashrc <<'DFEOF'");
+    expect(sh).toContain("chroot /rootfs flatpak remote-add --if-not-exists flathub");
+    expect(sh).toContain("chroot /rootfs flatpak install -y --noninteractive flathub");
+    expect(sh).toContain("sudo flatpak");
+  });
+
+  it("manual: README lista ficheros extra y howto flatpak", () => {
+    const readme = generateProject(appCfg("gentoo"))["manual/README.md"];
+    expect(readme).toContain("/etc/skel/.bashrc");
+    expect(readme).toContain("flatpak install");
+  });
+
+  it("sin flatpak ni ficheros extra: ningún rastro en el proyecto", () => {
+    const files = generateProject(cfgFor("debian"));
+    expect(
+      Object.keys(files).filter((p) => p.includes("flatpak") || p.includes("extra-"))
+    ).toEqual([]);
+    expect(files["livebuild/config/package-lists/distroforge.list.chroot"]).not.toContain(
+      "flatpak"
+    );
+  });
 });

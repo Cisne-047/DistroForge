@@ -34,6 +34,13 @@ export interface SystemConfig {
   keyboard: string;
 }
 
+/** Fichero arbitrario que se copia tal cual a la imagen (dotfiles, configs...). */
+export interface ExtraFile {
+  /** ruta absoluta dentro de la imagen (ej. /etc/skel/.bashrc) */
+  path: string;
+  content: string;
+}
+
 export interface DistroConfig {
   name: string;
   base: BaseId;
@@ -42,6 +49,10 @@ export interface DistroConfig {
   repos: CustomRepo[];
   system: SystemConfig;
   output: OutputFormat;
+  /** apps Flatpak de Flathub (ids tipo org.mozilla.firefox) */
+  flatpakApps: string[];
+  /** ficheros a copiar a la imagen por ruta absoluta */
+  extraFiles: ExtraFile[];
   /** inyectar cloud-init (NoCloud) para VMs/cloud */
   cloudInit: boolean;
   /** mensaje del día (/etc/motd) */

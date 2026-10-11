@@ -1,5 +1,7 @@
 import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
+import { flatpakPackages, flatpakShellLines } from "./flatpak";
+import { dirnameOf } from "./kickstart";
 
 function sq(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -20,9 +22,18 @@ export function wslFiles(cfg: DistroConfig): Record<string, string> {
   const base = baseById(cfg.base);
   const sys = cfg.system;
   const name = cfg.name;
-  const pkgs = [...desktopPackages(cfg.base, cfg.desktop), ...cfg.packages];
+  const pkgs = [...desktopPackages(cfg.base, cfg.desktop), ...flatpakPackages(cfg), ...cfg.packages];
   const repos = effectiveRepos(cfg);
   const engine = base.engine;
+
+  const extraFilesBlock = (cfg.extraFiles ?? [])
+    .map((f) => {
+      const dir = dirnameOf(f.path);
+      return `mkdir -p /rootfs${dir}\ncat > /rootfs${f.path} <<'DFEOF'\n${f.content}\nDFEOF`;
+    })
+    .join("\n");
+  const flatpakBlock = flatpakShellLines(cfg, "chroot /rootfs ").join("\n");
+  const preConf = [extraFilesBlock, flatpakBlock].filter(Boolean).join("\n");
 
   const confLines = [
     `cat > /rootfs/etc/wsl.conf <<'WSLEOF'`,
@@ -55,7 +66,7 @@ chroot /rootfs apt-get update
 chroot /rootfs env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G sudo ${sys.username}
 chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
-${confLines}
+${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
 echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
@@ -76,7 +87,7 @@ ${repoLines}
 pacstrap -c /rootfs base sudo ${pkgs.join(" ")}
 arch-chroot /rootfs useradd -m -s /bin/bash -G wheel ${sys.username}
 arch-chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
-${confLines}
+${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
 echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
@@ -94,7 +105,7 @@ ${repoLines}
 zypper --installroot /rootfs --no-gpg-checks -n install filesystem zypper sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G users ${sys.username}
 chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
-${confLines}
+${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
 echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
@@ -107,7 +118,7 @@ rm -rf /rootfs && mkdir -p /rootfs
 dnf install -y --installroot=/rootfs --releasever=41 --setopt=install_weak_deps=False --nodocs @core sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G wheel ${sys.username}
 chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
-${confLines}
+${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
 echo "Rootfs WSL listo en ./out/${name}-wsl.tar"

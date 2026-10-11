@@ -1,6 +1,7 @@
 import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
+import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import {
   dconfDbFiles,
   dconfSchemaFor,
@@ -43,6 +44,7 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
     "patterns-base-base",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
     ...wallpaperPackages(cfg, "zypper"),
+    ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
     ...cfg.packages,
   ]
@@ -86,6 +88,7 @@ ${pkgs}
     `echo "${sys.username} ALL=(ALL) ALL" > /etc/sudoers.d/50-${sys.username}`,
   ];
   if (cfg.motd) shLines.push("cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF");
+  if (hasFlatpakApps(cfg)) shLines.push(...flatpakShellLines(cfg));
   if (cfg.cloudInit)
     shLines.push(
       "mkdir -p /etc/cloud/cloud.cfg.d",
@@ -125,6 +128,9 @@ echo "Imagen lista en ./out"
   return {
     "kiwi/config.xml": configXml,
     "kiwi/config.sh": configSh,
+    ...Object.fromEntries(
+      (cfg.extraFiles ?? []).map((f) => [`kiwi/root${f.path}`, f.content])
+    ),
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

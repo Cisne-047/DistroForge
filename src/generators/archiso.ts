@@ -2,6 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { sanitizeAlias } from "./livebuild";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
+import { flatpakApps, flatpakPackages, FLATHUB, hasFlatpakApps } from "./flatpak";
 import {
   archDconfBootFiles,
   dconfDbFiles,
@@ -25,6 +26,7 @@ export function archisoFiles(cfg: DistroConfig): Record<string, string> {
     "sudo",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
     ...wallpaperPackages(cfg, "pacman"),
+    ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
     ...cfg.packages,
   ].join("\n");
@@ -69,6 +71,26 @@ echo "Imagen lista en ./out"
 `;
 
   const wallpaperFiles: Record<string, string> = {};
+
+  const flatpakFiles: Record<string, string> = {};
+  if (hasFlatpakApps(cfg)) {
+    // archiso no tiene hooks de chroot: Flathub y apps se instalan al primer arranque
+    flatpakFiles["archiso/airootfs/etc/systemd/system/distroforge-flatpak.service"] = `[Unit]
+Description=DistroForge - configura Flathub e instala apps Flatpak
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flatpak remote-add --if-not-exists flathub ${FLATHUB}
+ExecStart=/usr/bin/flatpak install -y --noninteractive flathub ${flatpakApps(cfg).join(" ")}
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+`;
+    flatpakFiles["archiso/airootfs/etc/tmpfiles.d/distroforge-flatpak.conf"] =
+      "L /etc/systemd/system/multi-user.target.wants/distroforge-flatpak.service - - - - /etc/systemd/system/distroforge-flatpak.service\n";
+  }
+
   if (wallpaperApplies(cfg)) {
     const wf = wallpaperFileName(cfg)!;
     wallpaperFiles[`archiso/airootfs/usr/share/backgrounds/${wf}`] = wallpaperDataUrl(cfg)!;
@@ -94,6 +116,10 @@ echo "Imagen lista en ./out"
     ...(cfg.cloudInit
       ? { "archiso/airootfs/etc/cloud/cloud.cfg.d/80-distroforge.cfg": cloudInitYaml(cfg) }
       : {}),
+    ...Object.fromEntries(
+      (cfg.extraFiles ?? []).map((f) => [`archiso/airootfs${f.path}`, f.content])
+    ),
+    ...flatpakFiles,
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

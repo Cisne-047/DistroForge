@@ -57,6 +57,23 @@ export function validate(cfg: DistroConfig): string[] {
     else if (baseById(cfg.base).engine === "kickstart")
       out.push("Wallpaper aún no se aplica en Fedora; se ignorará.");
   }
+  if (!Array.isArray(cfg.flatpakApps)) {
+    out.push("Flatpak: lista de apps inválida.");
+  } else {
+    for (const a of cfg.flatpakApps)
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(a))
+        out.push(`Flatpak: "${a}" no parece un id de app válido (ej. org.mozilla.firefox).`);
+  }
+  if (!Array.isArray(cfg.extraFiles)) {
+    out.push("Ficheros extra: lista inválida.");
+  } else {
+    cfg.extraFiles.forEach((f, i) => {
+      if (!f.path || !f.path.startsWith("/"))
+        out.push(`Fichero extra #${i + 1}: la ruta debe ser absoluta (empieza por /).`);
+      else if (f.path.includes(".."))
+        out.push(`Fichero extra #${i + 1}: la ruta no puede contener "..".`);
+    });
+  }
   cfg.repos.forEach((r, i) => {
     if (!r.url) {
       if (r.alias || r.gpgKey) out.push(`Repo #${i + 1}: falta la URL.`);
@@ -237,6 +254,10 @@ function readmeMd(cfg: DistroConfig): string {
     b.engine === "mkarchiso"
       ? "\nNota Arch: usuario, contraseña y zona horaria del live los gestiona el perfil releng de archiso; ajústalos tras arrancar o editando la receta.\n"
       : "";
+  const flatpakNote =
+    b.engine === "mkarchiso" && cfg.flatpakApps?.length
+      ? "\nNota Flatpak: en la ISO Arch las apps Flathub se instalan en el primer arranque (servicio distroforge-flatpak); necesita red.\n"
+      : "";
   return `# ${cfg.name}
 
 Distro personalizada generada con DistroForge.
@@ -244,12 +265,15 @@ Distro personalizada generada con DistroForge.
 - Base: ${b.label} (motor: ${b.engine})
 - Escritorio: ${desk}
 - Paquetes extra: ${cfg.packages.length ? cfg.packages.join(", ") : "ninguno"}
+- Flatpak: ${cfg.flatpakApps?.length ? cfg.flatpakApps.join(", ") : "ninguno"}
+- Ficheros extra: ${cfg.extraFiles?.length ?? 0}
 - Repos custom: ${repos.length ? repos.map((r) => r.url).join(", ") : "ninguno"}
 - Salida: ${cfg.output.toUpperCase()}${cfg.cloudInit ? " + cloud-init" : ""}
 - Wallpaper: ${cfg.wallpaper ? "sí" : "no"}
 ${cfg.output === "oci" ? "\nSalida OCI: construye con `bash build.sh` (docker o podman) o el workflow de CI; carga el .tar con `docker load -i`.\n" : ""}${cfg.output === "wsl" ? `\nSalida WSL: importa el tar en Windows con:\n\n    wsl --import ${cfg.name} C:\\WSL\\${cfg.name} <ruta>\\out\\${cfg.name}-wsl.tar\n\nLuego \`wsl -d ${cfg.name}\`. Usuario por defecto configurado vía /etc/wsl.conf.\n` : ""}${cfg.wallpaper ? "\nWallpaper: se copia a /usr/share/backgrounds y se aplica vía dconf (GNOME/MATE/Cinnamon/Budgie) o xfconf (Xfce). En KDE, i3, Sway y Pantheon solo se copia el fichero.\n" : ""}
 ${b.engine === "manual" ? "\n> Motor **manual**: sin builder automático; el zip trae lista de paquetes y guía.\n" : ""}
 ${archNote}
+${flatpakNote}
 ## Construir la imagen
 
 **Opción A — GitHub Actions (recomendado):** sube esta carpeta a un repo nuevo de GitHub. En *Actions → build → Run workflow*. El artefacto contendrá la imagen.
