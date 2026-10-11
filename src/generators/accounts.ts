@@ -1,6 +1,20 @@
 import type { DistroConfig } from "../types";
 import { desktopPackages } from "../catalog";
 
+/** Línea shell para el firewall (firewalld); tolerante si no está instalado. */
+export function firewallServiceLine(cfg: DistroConfig): string {
+  return cfg.firewall
+    ? `systemctl enable "firewalld" || true`
+    : `systemctl disable "firewalld" || true`;
+}
+
+/** Igual que firewallServiceLine pero como ExecStart de systemd. */
+export function firewallExecStart(cfg: DistroConfig): string {
+  return cfg.firewall
+    ? `ExecStart=/bin/sh -c 'systemctl enable --now "firewalld" || true'`
+    : `ExecStart=/bin/sh -c 'systemctl disable --now "firewalld" || true'`;
+}
+
 /** Sudo/wheel según familia de gestor de paquetes (lo pasan los generadores). */
 export type AdminGroup = "sudo" | "wheel" | "users";
 

@@ -1,8 +1,8 @@
 import type { DistroConfig } from "../types";
-import { baseById, desktopPackages, effectiveRepos } from "../catalog";
+import { baseById, desktopPackages, DEB_ARCH, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
-import { autologinFiles, extraUserShellLines, serviceShellLines } from "./accounts";
+import { autologinFiles, extraUserShellLines, firewallServiceLine, serviceShellLines } from "./accounts";
 import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
@@ -38,13 +38,15 @@ export function livebuildFiles(cfg: DistroConfig): Record<string, string> {
   const container = base.container ?? "debian:bookworm";
   const repos = effectiveRepos(cfg);
 
-  const bootAppend = `boot=live components locales=${sys.locale} keyboard-layouts=${sys.keyboard} timezone=${sys.timezone} hostname=${sys.hostname} username=${sys.username}`;
+  const lbArch = DEB_ARCH[cfg.arch] ?? "amd64";
+  const extraParams = (cfg.grub?.extraParams ?? "").replace(/["`$]/g, "").trim();
+  const bootAppend = `boot=live components locales=${sys.locale} keyboard-layouts=${sys.keyboard} timezone=${sys.timezone} hostname=${sys.hostname} username=${sys.username}${extraParams ? " " + extraParams : ""}`;
 
   const autoConfig = `#!/bin/sh
 set -e
 # DistroForge - configuracion live-build (${base.label})
 lb config noauto \\
-    --architectures amd64 \\
+    --architectures ${lbArch} \\
     --distribution ${distro} \\
     --archive-areas "${areas}" \\
     --mirror-bootstrap ${mirror} \\
@@ -53,6 +55,7 @@ lb config noauto \\
     --linux-packages "linux-image" \\
     --linux-flavours ${flavour} \\
     --iso-volume "${cfg.name.slice(0, 28)}" \\
+    --grub-timeout ${cfg.grub?.timeout ?? 10} \\
     --bootappend-live "${bootAppend}" \\
     "$@"
 `;
@@ -98,6 +101,7 @@ ${debLine}
     "wget",
     "ca-certificates",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
+    ...(cfg.firewall ? ["firewalld"] : []),
     ...wallpaperPackages(cfg, "apt"),
     ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
@@ -127,14 +131,11 @@ ${flatpakShellLines(cfg).join("\n")}
 `
     : "";
 
-  const servicesHook =
-    (cfg.services ?? []).length
-      ? `#!/bin/sh
+  const servicesHook = `#!/bin/sh
 set -e
-# DistroForge - servicios systemd
-${serviceShellLines(cfg).join("\n")}
-`
-      : "";
+# DistroForge - firewall y servicios systemd
+${[firewallServiceLine(cfg), ...serviceShellLines(cfg)].join("\n")}
+`;
 
   const net = staticNetwork(cfg);
   const netFiles: Record<string, string> = net

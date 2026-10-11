@@ -2,7 +2,7 @@ import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
-import { autologinFiles, serviceShellLines } from "./accounts";
+import { autologinFiles, firewallServiceLine, serviceShellLines } from "./accounts";
 import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
@@ -26,14 +26,16 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
   const base = baseById(cfg.base);
   const sys = cfg.system;
   const withDesktop = desktopPackages(cfg.base, cfg.desktop).length > 0;
+  const grubParams = (cfg.grub?.extraParams ?? "").replace(/["`$]/g, "").trim();
+  const kernAttr = grubParams ? ` kernelcmdline="${esc(grubParams)}"` : "";
   const typeTag =
     cfg.output === "qcow2"
-      ? `<type image="qcow2" filesystem="btrfs" primary="true"/>`
+      ? `<type image="qcow2" filesystem="btrfs" primary="true"${kernAttr}/>`
       : cfg.output === "usb"
-        ? `<type image="oem" filesystem="btrfs" primary="true"/>`
+        ? `<type image="oem" filesystem="btrfs" primary="true"${kernAttr}/>`
         : cfg.output === "vmdk" || cfg.output === "vdi"
-          ? `<type image="vmx" filesystem="btrfs" format="${cfg.output}" primary="true"/>`
-          : `<type image="iso" primary="true" firmware="uefi"/>`;
+          ? `<type image="vmx" filesystem="btrfs" format="${cfg.output}" primary="true"${kernAttr}/>`
+          : `<type image="iso" primary="true" firmware="uefi"${kernAttr}/>`;
 
   const repoTags = [
     `    <repository type="rpm-md" alias="${esc(base.id)}" url="${esc(base.mirror)}"/>`,
@@ -49,6 +51,7 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
     "dracut",
     "patterns-base-base",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
+    ...(cfg.firewall ? ["firewalld"] : []),
     ...wallpaperPackages(cfg, "zypper"),
     ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
@@ -72,6 +75,7 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
     <timezone>${esc(sys.timezone)}</timezone>
     <rpm-excludedocs>true</rpm-excludedocs>
     ${typeTag}
+    <bootloader name="grub2" timeout="${cfg.grub?.timeout ?? 10}"/>
   </preferences>
   <users>
 ${[
@@ -107,7 +111,7 @@ ${pkgs}
     ...effectiveRepos(cfg)
       .filter((r) => r.gpgKey)
       .map((r) => `rpm --import "${r.gpgKey}"`),
-    ...serviceShellLines(cfg),
+    ...[firewallServiceLine(cfg), ...serviceShellLines(cfg)],
   ];
   if (cfg.motd) shLines.push("cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF");
   if (hasFlatpakApps(cfg)) shLines.push(...flatpakShellLines(cfg));

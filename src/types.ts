@@ -1,4 +1,5 @@
 export type EngineId = "kiwi" | "livebuild" | "mkarchiso" | "kickstart" | "manual";
+export type ArchId = "x86_64" | "aarch64" | "armhf" | "i386";
 export type BaseId =
   | "opensuse-tumbleweed"
   | "opensuse-leap"
@@ -66,6 +67,22 @@ export interface NetworkConfig {
   dns: string[];
 }
 
+/** Opciones del arranque GRUB (pestaña Startup de SUSE Studio). */
+export interface GrubConfig {
+  /** segundos que el menú espera antes de arrancar la primera entrada */
+  timeout: number;
+  /** parámetros extra del kernel (appended al cmdline) */
+  extraParams: string;
+}
+
+/** Modo advanced: remasterizado de una ISO base que trae el usuario. */
+export interface CustomIsoConfig {
+  /** URL de la ISO base descargable (http/https, termina en .iso) */
+  url: string;
+  /** script avanzado del usuario, ejecutado dentro del chroot de la ISO */
+  chrootScript: string;
+}
+
 export interface DistroConfig {
   name: string;
   base: BaseId;
@@ -84,6 +101,16 @@ export interface DistroConfig {
   services: ServiceToggle[];
   /** red: DHCP (por defecto) o IP estática */
   network: NetworkConfig;
+  /** opciones del arranque GRUB */
+  grub: GrubConfig;
+  /** firewall (firewalld) habilitado en la imagen */
+  firewall: boolean;
+  /** arquitectura objetivo */
+  arch: ArchId;
+  /** modo advanced: remasterizar una ISO custom en vez de construir desde la base */
+  advanced: boolean;
+  /** datos del modo advanced (URL de la ISO y script chroot) */
+  customIso: CustomIsoConfig;
   /** auto-login del usuario principal en el escritorio */
   autologin: boolean;
   /** inyectar cloud-init (NoCloud) para VMs/cloud */

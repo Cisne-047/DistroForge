@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DistroConfig } from "./types";
 import { BASES, baseById, defaultConfig } from "./catalog";
+import { decodeConfig } from "./share";
 import { BaseStep, SystemStep, ReposStep, PackagesStep, OutputStep } from "./steps";
 
 const STEPS = [
@@ -17,6 +18,11 @@ const STORAGE_KEY = "distroforge-config";
 const PROJECTS_KEY = "distroforge-projects";
 
 function loadConfig(): DistroConfig {
+  // 1) config compartida por URL (#hash) tiene prioridad
+  if (typeof location !== "undefined" && location.hash.length > 20) {
+    const fromHash = decodeConfig(location.hash.slice(1));
+    if (fromHash) return { ...defaultConfig(fromHash.base), ...fromHash };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {

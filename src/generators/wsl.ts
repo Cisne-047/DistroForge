@@ -1,5 +1,5 @@
 import type { DistroConfig } from "../types";
-import { baseById, desktopPackages, effectiveRepos } from "../catalog";
+import { baseById, DEB_ARCH, desktopPackages, effectiveRepos } from "../catalog";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
 import { dirnameOf } from "./kickstart";
 import { sanitizeAlias } from "./livebuild";
@@ -83,7 +83,7 @@ set -euxo pipefail
 # DistroForge - rootfs WSL para ${base.label} (debootstrap)
 ${ensureBootstrap}
 rm -rf /rootfs && mkdir -p /rootfs
-debootstrap --variant=minbase ${distro} /rootfs ${mirror}
+debootstrap --variant=minbase --arch=${DEB_ARCH[cfg.arch] ?? "amd64"} ${distro} /rootfs ${mirror}
 ${repoLines}
 chroot /rootfs apt-get update
 chroot /rootfs env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sudo ${pkgs.join(" ")}

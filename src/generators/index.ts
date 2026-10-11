@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import type { DistroConfig } from "../types";
-import { baseById, effectiveRepos } from "../catalog";
+import { baseById, effectiveRepos, archsForEngine } from "../catalog";
 import { IPV4_RE } from "./network";
+import { customIsoFiles } from "./customiso";
 import { kiwiFiles } from "./kiwi";
 import { livebuildFiles } from "./livebuild";
 import { archisoFiles } from "./archiso";
@@ -13,10 +14,13 @@ import { wslFiles } from "./wsl";
 export type FileMap = Record<string, string>;
 
 export function generateProject(cfg: DistroConfig): FileMap {
+  if (cfg.advanced) return customIsoFiles(cfg);
   const engine = baseById(cfg.base).engine;
   const shared = () => ({
     ".github/workflows/build.yml": workflowYaml(cfg),
     "README.md": readmeMd(cfg),
+    // round-trip: el proyecto generado se reimporta en la app tal cual
+    "distroforge.json": JSON.stringify(cfg, null, 2) + "\n",
   });
   if (cfg.output === "oci" && engine !== "manual" && ociSupported(cfg))
     return { ...dockerfileFiles(cfg), ...shared() };
@@ -108,6 +112,21 @@ export function validate(cfg: DistroConfig): string[] {
         "Arch: la red estática no se aplica en la ISO live (NetworkManager hace DHCP al arrancar)."
       );
   }
+  if (!archsForEngine(baseById(cfg.base).engine).includes(cfg.arch))
+    out.push(`Arquitectura: ${cfg.arch} no soportada por el motor ${baseById(cfg.base).engine}.`);
+  if (
+    (cfg.output === "oci" || cfg.output === "wsl") &&
+    (cfg.arch === "armhf" || cfg.arch === "i386")
+  )
+    out.push("Arquitectura: armhf/i386 en OCI/WSL es experimental.");
+  if (cfg.grub && (!Number.isFinite(cfg.grub.timeout) || cfg.grub.timeout < 0 || cfg.grub.timeout > 999))
+    out.push("GRUB: timeout inválido (0-999 segundos).");
+  if (cfg.advanced) {
+    const url = cfg.customIso?.url ?? "";
+    if (!/^https?:\/\/.+/i.test(url)) out.push("Advanced: falta la URL de la ISO base (http/https).");
+    else if (!/\.iso([?#]|$)/i.test(url)) out.push("Advanced: la URL debe apuntar a un fichero .iso.");
+    if (cfg.output !== "iso") out.push("Advanced: la salida es siempre ISO.");
+  }
   cfg.repos.forEach((r, i) => {
     if (!r.url) {
       if (r.alias || r.gpgKey) out.push(`Repo #${i + 1}: falta la URL.`);
@@ -143,6 +162,10 @@ export async function downloadZip(cfg: DistroConfig): Promise<void> {
 function workflowYaml(cfg: DistroConfig): string {
   const engine = baseById(cfg.base).engine;
   const artifact = `${cfg.name}-image`;
+  const runner = cfg.arch === "aarch64" ? "ubuntu-24.04-arm" : "ubuntu-latest";
+  const qemuStep =
+    cfg.arch === "armhf" ? "      - name: QEMU\n        uses: docker/setup-qemu-action@v3\n" : "";
+  const grubExtra = (cfg.grub?.extraParams ?? "").replace(/["`$\\/]/g, "").trim();
   const head = `name: build
 on:
   workflow_dispatch:
@@ -150,7 +173,7 @@ on:
     branches: [main]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${runner}
 `;
   const upload = (path: string) => `      - name: Subir artefacto
         uses: actions/upload-artifact@v4
@@ -179,10 +202,22 @@ jobs:
     return `${head}    steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Construir imagen OCI
+${qemuStep}      - name: Construir imagen OCI
         run: |
           docker build -t ${cfg.name}:1.0.0 .
           docker save ${cfg.name}:1.0.0 -o ${cfg.name}.tar
+      - name: SBOM (syft)
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          artifact: image
+          image: ${cfg.name}:1.0.0
+      - name: Escaneo CVE (trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${cfg.name}:1.0.0
+          severity: HIGH,CRITICAL
+          exit-code: "0"
       - name: Subir artefacto
         uses: actions/upload-artifact@v4
         with:
@@ -207,7 +242,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Construir rootfs WSL
+${qemuStep}      - name: Construir rootfs WSL
         run: bash wsl/rootfs.sh
 ${upload("out/*.tar")}`;
   }
@@ -231,7 +266,7 @@ ${upload("out/*")}`;
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Instalar live-build
+${qemuStep}      - name: Instalar live-build
         run: apt-get update && apt-get install -y live-build
       - name: Construir imagen
         run: |
@@ -256,6 +291,9 @@ ${upload("livebuild/*.iso")}`;
           cp archiso/packages.x86_64 /tmp/profile/packages.x86_64
           cp archiso/pacman.conf /tmp/profile/pacman.conf
           cp -a archiso/airootfs/. /tmp/profile/airootfs/
+          if [ -f /tmp/profile/grub/grub.cfg ]; then
+            sed -i "s/^set timeout.*/set timeout=${cfg.grub?.timeout ?? 10}/" /tmp/profile/grub/grub.cfg${grubExtra ? `\n            sed -i "/^[[:space:]]*linux /s/archisolabel=[^ ]*/& ${grubExtra}/" /tmp/profile/grub/grub.cfg` : ""}
+          fi
           mkdir -p /tmp/work out
           mkarchiso -v -w /tmp/work -o out /tmp/profile
 ${upload("out/*.iso")}`;
@@ -302,6 +340,10 @@ Distro personalizada generada con DistroForge.
 - Flatpak: ${cfg.flatpakApps?.length ? cfg.flatpakApps.join(", ") : "ninguno"}
 - Ficheros extra: ${cfg.extraFiles?.length ?? 0}
 - Usuarios extra: ${cfg.users?.length ?? 0} · Servicios systemd: ${cfg.services?.length ?? 0}${cfg.autologin ? " · auto-login" : ""}
+- Arquitectura: ${cfg.arch} · GRUB: timeout ${cfg.grub?.timeout ?? 10}s${cfg.grub?.extraParams ? ` · kernel: ${cfg.grub.extraParams}` : ""} · Firewall: ${cfg.firewall ? "habilitado (firewalld)" : "deshabilitado"}
+- Red: ${cfg.network?.mode === "static" ? `estática (${cfg.network.ip}/${cfg.network.prefix})` : "DHCP"}
+
+> Este proyecto incluye \`distroforge.json\`: puedes reimportarlo en DistroForge (Cargar config) o editarlo en git y volver a construir.
 - Repos custom: ${repos.length ? repos.map((r) => r.url).join(", ") : "ninguno"}
 - Salida: ${cfg.output.toUpperCase()}${cfg.cloudInit ? " + cloud-init" : ""}
 - Wallpaper: ${cfg.wallpaper ? "sí" : "no"}

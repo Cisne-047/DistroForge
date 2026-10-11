@@ -1,4 +1,4 @@
-import type { BaseId, CustomRepo, DistroConfig, EngineId } from "./types";
+import type { ArchId, BaseId, CustomRepo, DistroConfig, EngineId } from "./types";
 
 export interface DesktopDef {
   id: string;
@@ -360,6 +360,21 @@ export function desktopPackages(baseId: BaseId, desktopId: string): string[] {
   return baseById(baseId).desktops.find((d) => d.id === desktopId)?.packages ?? [];
 }
 
+/** Arquitecturas que cada motor sabe construir de forma fiable. */
+export function archsForEngine(engine: EngineId): ArchId[] {
+  if (engine === "livebuild") return ["x86_64", "aarch64", "armhf", "i386"];
+  if (engine === "kickstart" || engine === "kiwi") return ["x86_64", "aarch64"];
+  return ["x86_64"]; // mkarchiso y manual: solo x86_64
+}
+
+/** Nombres de arquitectura estilo Debian (live-build, debootstrap). */
+export const DEB_ARCH: Record<ArchId, string> = {
+  x86_64: "amd64",
+  aarch64: "arm64",
+  armhf: "armhf",
+  i386: "i386",
+};
+
 /** Al cambiar de base: quita presets de la base anterior y añade los de la nueva.
  *  Los repos añadidos por el usuario (que no son preset de ninguna base) se conservan. */
 export function mergePresets(nextBase: BaseDef, repos: CustomRepo[]): CustomRepo[] {
@@ -447,6 +462,11 @@ export function defaultConfig(base: BaseId): DistroConfig {
     users: [],
     services: [],
     network: { mode: "dhcp", ip: "", prefix: "24", gateway: "", dns: [] },
+    grub: { timeout: 10, extraParams: "" },
+    firewall: true,
+    arch: "x86_64",
+    advanced: false,
+    customIso: { url: "", chrootScript: "" },
     autologin: false,
     cloudInit: false,
     motd: "Bienvenido a tu distro personalizada (DistroForge)",

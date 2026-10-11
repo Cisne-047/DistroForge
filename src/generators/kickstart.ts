@@ -58,6 +58,8 @@ ${postLines.join("\n")}
   const netLine = net
     ? `network --bootproto=static --ip=${net.ip} --netmask=${dottedMask(net.prefix)} --gateway=${net.gateway} --nameserver=${net.dns.join(",")} --hostname=${sys.hostname}`
     : `network --bootproto=dhcp --hostname=${sys.hostname}`;
+  const ksArch = cfg.arch === "aarch64" ? "aarch64" : "x86_64";
+  const grubAppend = (cfg.grub?.extraParams ?? "").replace(/["`$]/g, "").trim();
 
   const ks = `# DistroForge - kickstart Fedora
 lang ${sys.locale}
@@ -73,12 +75,13 @@ ${(cfg.users ?? [])
   )
   .join("\n")}
 firstboot --disable
-bootloader --location=mbr
+firewall ${cfg.firewall ? "--enabled" : "--disabled"}
+bootloader --location=mbr --timeout=${cfg.grub?.timeout ?? 10}${grubAppend ? ` --append="${grubAppend}"` : ""}
 zerombr
 clearpart --all --initlabel
 autopart
 reboot
-url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=x86_64"
+url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=${ksArch}"
 ${repoLines}
 %packages
 @core

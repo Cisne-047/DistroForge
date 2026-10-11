@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { load as yamlLoad } from "js-yaml";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { BASES, defaultConfig } from "../src/catalog";
 import { generateProject, validate } from "../src/generators";
 import type { BaseId, DistroConfig, OutputFormat } from "../src/types";
@@ -663,5 +667,149 @@ describe("bloque 7: red estática", () => {
     expect(validate(c)).toEqual([]);
     const a = netCfg("arch");
     expect(validate(a).some((i) => i.includes("ISO live"))).toBe(true);
+  });
+});
+
+describe("bloques 8-11: firewall, share, plantillas, arch, grub, advanced", () => {
+  it("firewall: firewalld en paquetes y servicio; kickstart --enabled/--disabled", () => {
+    const on = cfgFor("debian");
+    const f = generateProject(on);
+    expect(f["livebuild/config/package-lists/distroforge.list.chroot"]).toContain("firewalld");
+    expect(f["livebuild/config/hooks/0340-services.hooks.chroot"]).toContain(
+      'systemctl enable "firewalld"'
+    );
+    expect(generateProject(cfgFor("fedora"))["fedora/ks.cfg"]).toContain("firewall --enabled");
+    const off = cfgFor("fedora");
+    off.firewall = false;
+    expect(generateProject(off)["fedora/ks.cfg"]).toContain("firewall --disabled");
+    expect(generateProject(cfgFor("opensuse-tumbleweed"))["kiwi/config.xml"]).toContain(
+      'name="firewalld"'
+    );
+  });
+
+  it("round-trip: distroforge.json en el proyecto y reimportable", () => {
+    const c = cfgFor("debian");
+    c.users = [{ name: "ana", password: "ana12345", admin: true }];
+    const parsed = JSON.parse(generateProject(c)["distroforge.json"]);
+    expect(parsed.name).toBe("mi-distro");
+    expect(parsed.users[0].name).toBe("ana");
+    expect(validate(parsed)).toEqual([]);
+  });
+
+  it("share: encode/decode round-trip unicode; basura a null", async () => {
+    const { encodeConfig, decodeConfig } = await import("../src/share");
+    const c = cfgFor("debian");
+    c.system.password = "contraseña-ñ-123";
+    const decoded = decodeConfig(encodeConfig(c));
+    expect(decoded?.system.password).toBe(c.system.password);
+    expect(decoded?.users).toEqual([]);
+    expect(decodeConfig("!!!basura!!!")).toBeNull();
+  });
+
+  it("plantillas: applyTemplate respeta los escritorios de la base", async () => {
+    const { applyTemplate, TEMPLATES } = await import("../src/templates");
+    const kiosk = TEMPLATES.find((t) => t.id === "kiosk")!;
+    const mint = applyTemplate(cfgFor("mint"), kiosk);
+    expect(mint.autologin).toBe(true);
+    expect(mint.desktop).toBe("cinnamon");
+    expect(applyTemplate(cfgFor("arch"), kiosk).desktop).toBe("gnome");
+    const wsl = applyTemplate(cfgFor("debian"), TEMPLATES.find((t) => t.id === "wsldev")!);
+    expect(wsl.output).toBe("wsl");
+  });
+
+  it("OCI: workflow con SBOM (syft) y escaneo CVE (trivy)", () => {
+    const c = cfgFor("debian");
+    c.output = "oci";
+    const yml = generateProject(c)[".github/workflows/build.yml"];
+    expect(yml).toContain("anchore/sbom-action");
+    expect(yml).toContain("aquasecurity/trivy-action");
+  });
+
+  it("QA de sintaxis: todos los .sh generados pasan bash -n", () => {
+    const dir = mkdtempSync(join(tmpdir(), "df-shcheck-"));
+    try {
+      for (const b of BASES) {
+        for (const o of outputsFor(b.engine)) {
+          const c = cfgFor(b.id);
+          c.output = o;
+          for (const [p, content] of Object.entries(generateProject(c))) {
+            if (!p.endsWith(".sh") && !p.endsWith(".chroot") && !p.endsWith(".hooks.chroot"))
+              continue;
+            const file = join(dir, "script");
+            writeFileSync(file, content);
+            const r = spawnSync("bash", ["-n", file], { encoding: "utf8" });
+            expect(r.status, `${b.id}/${o}: ${p} — ${r.stderr}`).toBe(0);
+          }
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("arquitecturas: live-build/debootstrap mapean, CI usa arm-runner y QEMU, validate limita", () => {
+    const a = cfgFor("debian");
+    a.arch = "aarch64";
+    expect(generateProject(a)["livebuild/auto/config"]).toContain("--architectures arm64");
+    const f = cfgFor("fedora");
+    f.arch = "aarch64";
+    expect(generateProject(f)["fedora/ks.cfg"]).toContain("arch=aarch64");
+    const armhf = cfgFor("debian");
+    armhf.arch = "armhf";
+    expect(generateProject(armhf)[".github/workflows/build.yml"]).toContain(
+      "setup-qemu-action"
+    );
+    const k = cfgFor("opensuse-tumbleweed");
+    k.arch = "aarch64";
+    expect(generateProject(k)[".github/workflows/build.yml"]).toContain("ubuntu-24.04-arm");
+    const w = cfgFor("ubuntu");
+    w.output = "wsl";
+    w.arch = "aarch64";
+    expect(generateProject(w)["wsl/rootfs.sh"]).toContain("--arch=arm64");
+    const ar = cfgFor("arch");
+    ar.arch = "aarch64";
+    expect(validate(ar).some((i) => i.includes("no soportada"))).toBe(true);
+  });
+
+  it("GRUB: timeout y parámetros del kernel en los cuatro motores", () => {
+    const g = (c: DistroConfig) => {
+      c.grub = { timeout: 7, extraParams: "quiet splash vt.global_cursor_default=0" };
+      return c;
+    };
+    const lb = generateProject(g(cfgFor("debian")));
+    expect(lb["livebuild/auto/config"]).toContain("--grub-timeout 7");
+    expect(lb["livebuild/auto/config"]).toContain("vt.global_cursor_default=0");
+    const ks = generateProject(g(cfgFor("fedora")))["fedora/ks.cfg"];
+    expect(ks).toContain("--timeout=7");
+    expect(ks).toContain('--append="quiet splash vt.global_cursor_default=0"');
+    const ki = generateProject(g(cfgFor("opensuse-tumbleweed")))["kiwi/config.xml"];
+    expect(ki).toContain('kernelcmdline="quiet splash vt.global_cursor_default=0"');
+    expect(ki).toContain('<bootloader name="grub2" timeout="7"/>');
+    const ar = generateProject(g(cfgFor("arch")));
+    expect(ar["build.sh"]).toContain("set timeout=7");
+    expect(ar["build.sh"]).toContain("vt.global_cursor_default=0");
+  });
+
+  it("advanced: remaster con chroot del usuario, workflow y validación de URL", () => {
+    const c = cfgFor("debian");
+    c.advanced = true;
+    c.customIso = { url: "https://example.com/exotic.iso", chrootScript: "apt install -y htop" };
+    const files = generateProject(c);
+    expect(files["advanced/download.sh"]).toContain("wget -c");
+    const chroot = files["advanced/chroot.sh"];
+    expect(chroot).toContain('useradd -m -s /bin/bash -G sudo "user"');
+    expect(chroot).toContain("apt install -y htop");
+    expect(files[".github/workflows/build.yml"]).toContain("remaster.sh");
+    expect(validate(c)).toEqual([]);
+    c.customIso.url = "ftp://mala-url";
+    expect(validate(c).some((i) => i.includes("Advanced"))).toBe(true);
+  });
+
+  it("config por defecto de cada base sigue pasando validación", () => {
+    for (const b of BASES) {
+      const c = defaultConfig(b.id);
+      c.system.password = "x12345678";
+      expect(validate(c), `base ${b.id}`).toEqual([]);
+    }
   });
 });

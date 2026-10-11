@@ -5,6 +5,7 @@ import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakApps, flatpakPackages, FLATHUB, hasFlatpakApps } from "./flatpak";
 import {
   autologinFiles,
+  firewallExecStart,
   serviceExecStartLines,
   userExecStartLines,
 } from "./accounts";
@@ -30,6 +31,7 @@ export function archisoFiles(cfg: DistroConfig): Record<string, string> {
     "networkmanager",
     "sudo",
     ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : []),
+    ...(cfg.firewall ? ["firewalld"] : []),
     ...wallpaperPackages(cfg, "pacman"),
     ...flatpakPackages(cfg),
     ...desktopPackages(cfg.base, cfg.desktop),
@@ -58,6 +60,11 @@ Server = ${base.mirror}
 Server = ${base.mirror}
 ${repoSections ? "\n" + repoSections + "\n" : ""}`;
 
+  const grubParams = (cfg.grub?.extraParams ?? "").replace(/["`$\\/]/g, "").trim();
+  const grubSeds = `  if [ -f /tmp/profile/grub/grub.cfg ]; then
+  sed -i "s/^set timeout.*/set timeout=${cfg.grub?.timeout ?? 10}/" /tmp/profile/grub/grub.cfg${grubParams ? `\n  sed -i "/^[[:space:]]*linux /s/archisolabel=[^ ]*/& ${grubParams}/" /tmp/profile/grub/grub.cfg` : ""}
+  fi`;
+
   const buildSh = `#!/usr/bin/env bash
 set -euo pipefail
 # DistroForge - build local (Linux o WSL2, requiere Podman)
@@ -69,6 +76,7 @@ podman run --rm --privileged -v "$DIR":/project -v "$DIR/out":/out archlinux:bas
   cp /project/archiso/packages.x86_64 /tmp/profile/packages.x86_64
   cp /project/archiso/pacman.conf /tmp/profile/pacman.conf
   cp -a /project/archiso/airootfs/. /tmp/profile/airootfs/
+${grubSeds}
   mkdir -p /tmp/work
   mkarchiso -v -w /tmp/work -o /out /tmp/profile
 '
@@ -110,7 +118,7 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 `;
-  const svcExecs = serviceExecStartLines(cfg);
+  const svcExecs = [...serviceExecStartLines(cfg), firewallExecStart(cfg)];
   if (svcExecs.length)
     accountFiles["archiso/airootfs/etc/systemd/system/distroforge-services.service"] = `[Unit]
 Description=DistroForge - habilita/deshabilita servicios

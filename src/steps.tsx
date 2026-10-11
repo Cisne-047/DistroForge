@@ -1,12 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, ServiceToggle, SystemConfig } from "./types";
-import { BASES, baseById, defaultConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
+import { BASES, baseById, archsForEngine, defaultConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
+import { TEMPLATES, applyTemplate } from "./templates";
+import { shareUrl } from "./share";
 import { generateProject, validate, downloadZip } from "./generators";
 
 type Upd = (patch: Partial<DistroConfig>) => void;
 
 export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const b = baseById(cfg.base);
+  const archs = archsForEngine(b.engine);
   return (
     <section>
       <h2>1. Base</h2>
@@ -14,6 +17,14 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         Distribución sobre la que montas tu distro. El motor de construcción se elige solo:
         KIWI (openSUSE), live-build (Debian), mkarchiso (Arch) o kickstart (Fedora).
       </p>
+      <h3>Plantillas rápidas</h3>
+      <div className="chips">
+        {TEMPLATES.map((t) => (
+          <button key={t.id} className="chip" title={t.desc} onClick={() => upd(applyTemplate(cfg, t))}>
+            ✨ {t.label}
+          </button>
+        ))}
+      </div>
       <div className="cards">
         {BASES.map((x) => (
           <button
@@ -24,6 +35,7 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
                 base: x.id,
                 desktop: x.desktops[0].id,
                 repos: mergePresets(x, cfg.repos),
+                arch: archsForEngine(x.engine).includes(cfg.arch) ? cfg.arch : "x86_64",
                 output:
                   x.engine === "kiwi"
                     ? cfg.output
@@ -50,6 +62,58 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           </button>
         ))}
       </div>
+      <h3>Arquitectura</h3>
+      <div className="cards">
+        {archs.map((a) => (
+          <button
+            key={a}
+            className={"card clickable" + (a === cfg.arch ? " sel" : "")}
+            onClick={() => upd({ arch: a })}
+          >
+            <strong>{a}</strong>
+          </button>
+        ))}
+      </div>
+      <h3>Modo advanced (experimental)</h3>
+      <p className="hint">
+        Remasteriza una ISO que tú aportas (cualquier distro exótica): se extrae, se aplica tu
+        config en un chroot y se reconstruye. Salida ISO única.
+      </p>
+      <label className="chk">
+        <input
+          type="checkbox"
+          checked={cfg.advanced}
+          onChange={(e) => upd({ advanced: e.target.checked })}
+        />
+        Usar una ISO custom como base
+      </label>
+      {cfg.advanced && (
+        <div className="fields">
+          <label className="field" style={{ gridColumn: "1 / -1" }}>
+            URL de la ISO base (descargable, termina en .iso)
+            <input
+              value={cfg.customIso?.url ?? ""}
+              placeholder="https://ejemplo.com/distro-amd64.iso"
+              onChange={(e) =>
+                upd({ customIso: { ...(cfg.customIso ?? { url: "", chrootScript: "" }), url: e.target.value } })
+              }
+            />
+          </label>
+          <label className="field" style={{ gridColumn: "1 / -1" }}>
+            Script chroot avanzado (se añade al generado; control total)
+            <textarea
+              rows={5}
+              value={cfg.customIso?.chrootScript ?? ""}
+              placeholder="#!/bin/bash — comandos libres dentro del chroot"
+              onChange={(e) =>
+                upd({
+                  customIso: { ...(cfg.customIso ?? { url: "", chrootScript: "" }), chrootScript: e.target.value },
+                })
+              }
+            />
+          </label>
+        </div>
+      )}
     </section>
   );
 }
@@ -172,6 +236,14 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             onChange={(e) => upd({ cloudInit: e.target.checked })}
           />
           Inyectar cloud-init (NoCloud: usuario, hostname y zona horaria — útil en VMs/cloud)
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.firewall}
+            onChange={(e) => upd({ firewall: e.target.checked })}
+          />
+          Firewall habilitado (firewalld; en Fedora lo gestiona el kickstart)
         </label>
         <label className="chk" style={{ gridColumn: "1 / -1" }}>
           <input
@@ -499,11 +571,13 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const current = sel && sel in files ? sel : names[0];
   const issues = validate(cfg);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const b = baseById(cfg.base);
 
-  const outOptions: { v: OutputFormat; l: string }[] =
-    b.engine === "kiwi"
+  const outOptions: { v: OutputFormat; l: string }[] = cfg.advanced
+    ? []
+    : b.engine === "kiwi"
       ? [
           { v: "iso", l: "ISO híbrida (live/installer)" },
           { v: "qcow2", l: "Disco QCOW2 (VM)" },
@@ -568,7 +642,9 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         </label>
       ) : (
         <p className="hint">
-          Motor manual: el zip incluye lista de paquetes y guía, sin build automático.
+          {cfg.advanced
+            ? "Modo advanced: salida ISO única (remaster de tu ISO base)."
+            : "Motor manual: el zip incluye lista de paquetes y guía, sin build automático."}
         </p>
       )}
       {issues.length > 0 && (
@@ -611,6 +687,20 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         <button className="btn ghost" onClick={() => fileRef.current?.click()}>
           Cargar config
         </button>
+        <button
+          className="btn ghost"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(shareUrl(cfg));
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            } catch {
+              alert("El navegador no permitió copiar al portapapeles.");
+            }
+          }}
+        >
+          {copied ? "¡Enlace copiado!" : "Copiar enlace"}
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -623,8 +713,10 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         />
       </p>
       <p className="hint">
-        El zip incluye la receta, build.sh (Podman en Linux/WSL2) y un workflow de GitHub
-        Actions para construir la imagen en CI.
+        El zip incluye la receta, build.sh (Podman en Linux/WSL2), un workflow de GitHub
+        Actions para construir la imagen y <code>distroforge.json</code> (reimportable en la
+        app y diffable en git). El enlace para compartir lleva la config en la URL —
+        incluida la contraseña, en claro.
       </p>
     </section>
   );
