@@ -1,0 +1,70 @@
+import type { DistroConfig } from "../types";
+import { desktopPackages, effectiveRepos } from "../catalog";
+import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
+
+export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
+  const sys = cfg.system;
+  const repos = effectiveRepos(cfg);
+
+  const repoLines = repos
+    .map(
+      (r) =>
+        `repo --name="${r.alias}" --baseurl="${r.url}"${r.gpgKey ? "" : " --nogpgcheck"}`
+    )
+    .join("\n");
+
+  const postLines = [
+    'echo "DistroForge" > /etc/distroforge-release',
+    ...(cfg.motd ? ["cat > /etc/motd <<'MOTDEOF'", cfg.motd, "MOTDEOF"] : []),
+    ...(cfg.cloudInit
+      ? [
+          "mkdir -p /etc/cloud/cloud.cfg.d",
+          "cat > /etc/cloud/cloud.cfg.d/80-distroforge.cfg <<'CIEOF'",
+          cloudInitYaml(cfg),
+          "CIEOF",
+        ]
+      : []),
+  ];
+  const postBlock = `%post
+${postLines.join("\n")}
+%end
+`;
+
+  const ks = `# DistroForge - kickstart Fedora
+lang ${sys.locale}
+keyboard --vckeymap=${sys.keyboard} --xlayouts='${sys.keyboard}'
+timezone ${sys.timezone} --utc
+network --bootproto=dhcp --hostname=${sys.hostname}
+rootpw --lock
+user --name=${sys.username} --password=${sys.password} --plaintext --groups=wheel
+firstboot --disable
+bootloader --location=mbr
+zerombr
+clearpart --all --initlabel
+autopart
+reboot
+url --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=x86_64"
+${repoLines}
+%packages
+@core
+${[...desktopPackages(cfg.base, cfg.desktop), ...cfg.packages, ...(cfg.cloudInit ? [CLOUD_INIT_PACKAGE] : [])].join("\n")}
+%end
+
+${postBlock}`;
+
+  const buildSh = `#!/usr/bin/env bash
+set -euo pipefail
+# DistroForge - build local (Linux o WSL2, requiere Podman)
+DIR="$(cd "$(dirname "$0")" && pwd)"
+podman run --rm --privileged -v "$DIR":/project -v "$DIR/out":/out fedora:latest bash -ec '
+  dnf install -y livemedia-creator
+  livemedia-creator --no-virt --make-iso --ks /project/fedora/ks.cfg --releasever 41 --iso-only --iso-name ${cfg.name}.iso --resultdir /out
+'
+echo "Imagen lista en ./out/${cfg.name}.iso"
+`;
+
+  return {
+    "fedora/ks.cfg": ks,
+    "build.sh": buildSh,
+  };
+}

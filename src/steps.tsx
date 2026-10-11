@@ -1,0 +1,411 @@
+import { useMemo, useRef, useState } from "react";
+import type { CustomRepo, DistroConfig, OutputFormat, SystemConfig } from "./types";
+import { BASES, baseById, defaultConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
+import { generateProject, validate, downloadZip } from "./generators";
+
+type Upd = (patch: Partial<DistroConfig>) => void;
+
+export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const b = baseById(cfg.base);
+  return (
+    <section>
+      <h2>1. Base</h2>
+      <p className="hint">
+        Distribución sobre la que montas tu distro. El motor de construcción se elige solo:
+        KIWI (openSUSE), live-build (Debian), mkarchiso (Arch) o kickstart (Fedora).
+      </p>
+      <div className="cards">
+        {BASES.map((x) => (
+          <button
+            key={x.id}
+            className={"card clickable" + (x.id === cfg.base ? " sel" : "")}
+            onClick={() =>
+              upd({
+                base: x.id,
+                desktop: x.desktops[0].id,
+                repos: mergePresets(x, cfg.repos),
+                output:
+                  x.engine === "kiwi"
+                    ? cfg.output
+                    : cfg.output === "qcow2"
+                      ? "iso"
+                      : cfg.output,
+              })
+            }
+          >
+            <strong>{x.label}</strong>
+            <span className="tag">motor: {x.engine}</span>
+          </button>
+        ))}
+      </div>
+      <h3>Escritorio</h3>
+      <div className="cards">
+        {b.desktops.map((d) => (
+          <button
+            key={d.id}
+            className={"card clickable" + (d.id === cfg.desktop ? " sel" : "")}
+            onClick={() => upd({ desktop: d.id })}
+          >
+            <strong>{d.label}</strong>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const s = cfg.system;
+  const setS = (patch: Partial<SystemConfig>) => upd({ system: { ...s, ...patch } });
+  return (
+    <section>
+      <h2>2. Sistema</h2>
+      <p className="hint">Identidad, usuario e idioma de tu distro.</p>
+      <div className="fields">
+        <label className="field">
+          Hostname
+          <input value={s.hostname} onChange={(e) => setS({ hostname: e.target.value })} />
+        </label>
+        <label className="field">
+          Usuario
+          <input value={s.username} onChange={(e) => setS({ username: e.target.value })} />
+        </label>
+        <label className="field">
+          Contraseña (va en claro a la receta de build)
+          <input
+            type="password"
+            value={s.password}
+            onChange={(e) => setS({ password: e.target.value })}
+          />
+        </label>
+        <label className="field">
+          Zona horaria
+          <select value={s.timezone} onChange={(e) => setS({ timezone: e.target.value })}>
+            {TIMEZONES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Locale
+          <select value={s.locale} onChange={(e) => setS({ locale: e.target.value })}>
+            {LOCALES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Teclado
+          <select value={s.keyboard} onChange={(e) => setS({ keyboard: e.target.value })}>
+            {KEYBOARDS.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field" style={{ gridColumn: "1 / -1" }}>
+          Mensaje MOTD (/etc/motd)
+          <textarea
+            value={cfg.motd}
+            rows={2}
+            onChange={(e) => upd({ motd: e.target.value })}
+          />
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.cloudInit}
+            onChange={(e) => upd({ cloudInit: e.target.checked })}
+          />
+          Inyectar cloud-init (NoCloud: usuario, hostname y zona horaria — útil en VMs/cloud)
+        </label>
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          Wallpaper (se aplica en GNOME/MATE/Cinnamon/Budgie/Xfce; en KDE/i3/Sway solo se copia)
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {cfg.wallpaper ? (
+              <>
+                <img src={cfg.wallpaper} alt="wallpaper actual" className="wall-prev" />
+                <button className="btn ghost" onClick={() => upd({ wallpaper: "" })}>
+                  Quitar
+                </button>
+              </>
+            ) : (
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  if (f.size > 2 * 1024 * 1024) {
+                    alert("Imagen demasiado grande (máximo 2 MB).");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => upd({ wallpaper: String(reader.result) });
+                  reader.readAsDataURL(f);
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function ReposStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const setRepo = (i: number, patch: Partial<CustomRepo>) =>
+    upd({ repos: cfg.repos.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
+  const add = () =>
+    upd({
+      repos: [
+        ...cfg.repos,
+        { alias: "", url: "", gpgKey: "", suite: "", enabled: true },
+      ],
+    });
+  const del = (i: number) => upd({ repos: cfg.repos.filter((_, j) => j !== i) });
+  return (
+    <section>
+      <h2>3. Repositorios custom</h2>
+      <p className="hint">
+        URLs extra: OBS, COPR, tu propio mirror... La URL va tal cual al gestor de paquetes
+        del motor (zypper/apt/pacman/dnf). Si el repo necesita clave GPG, pon la URL de la key.
+      </p>
+      {cfg.repos.map((r, i) => (
+        <div className="repo-row" key={i}>
+          <input
+            value={r.alias}
+            onChange={(e) => setRepo(i, { alias: e.target.value })}
+            placeholder="alias"
+          />
+          <input
+            value={r.url}
+            onChange={(e) => setRepo(i, { url: e.target.value })}
+            placeholder="https://... url del repo"
+          />
+          <input
+            value={r.gpgKey}
+            onChange={(e) => setRepo(i, { gpgKey: e.target.value })}
+            placeholder="URL key GPG (opcional)"
+          />
+          <input
+            value={r.suite}
+            onChange={(e) => setRepo(i, { suite: e.target.value })}
+            placeholder="suite comps (ej. noble main)"
+          />
+          <label className="chk">
+            <input
+              type="checkbox"
+              checked={r.enabled}
+              onChange={(e) => setRepo(i, { enabled: e.target.checked })}
+            />
+            activo
+          </label>
+          <button className="icon" title="Eliminar" onClick={() => del(i)}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <button className="btn ghost" onClick={add}>
+        + Añadir repo
+      </button>
+    </section>
+  );
+}
+
+export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const [q, setQ] = useState("");
+  const [draft, setDraft] = useState("");
+  const b = baseById(cfg.base);
+  const sugg = b.suggestions.filter(
+    (s) => s.toLowerCase().includes(q.toLowerCase()) && !cfg.packages.includes(s)
+  );
+  const toggle = (p: string) =>
+    upd({
+      packages: cfg.packages.includes(p)
+        ? cfg.packages.filter((x) => x !== p)
+        : [...cfg.packages, p],
+    });
+  const add = () => {
+    const p = draft.trim();
+    if (p && !cfg.packages.includes(p)) upd({ packages: [...cfg.packages, p] });
+    setDraft("");
+  };
+  return (
+    <section>
+      <h2>4. Paquetes</h2>
+      <p className="hint">
+        Los nombres deben existir en los repos de {b.label}. Al cambiar de base, revisa que
+        sigan siendo válidos (cada distro nombra los paquetes distinto).
+      </p>
+      <div className="fields">
+        <label className="field">
+          Añadir paquete (Enter)
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="ej. neofetch"
+          />
+        </label>
+        <label className="field">
+          Filtrar sugeridos
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar..." />
+        </label>
+      </div>
+      <h3>Tus paquetes ({cfg.packages.length})</h3>
+      <div className="chips">
+        {cfg.packages.map((p) => (
+          <button key={p} className="chip sel" onClick={() => toggle(p)}>
+            {p}
+            <span className="x">×</span>
+          </button>
+        ))}
+        {cfg.packages.length === 0 && <span className="hint">Ninguno todavía.</span>}
+      </div>
+      <h3>Sugeridos</h3>
+      <div className="chips">
+        {sugg.map((p) => (
+          <button key={p} className="chip" onClick={() => toggle(p)}>
+            + {p}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
+  const files = useMemo(() => generateProject(cfg), [cfg]);
+  const names = Object.keys(files);
+  const [sel, setSel] = useState<string | null>(null);
+  const current = sel && sel in files ? sel : names[0];
+  const issues = validate(cfg);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const b = baseById(cfg.base);
+
+  const outOptions: { v: OutputFormat; l: string }[] =
+    b.engine === "kiwi"
+      ? [
+          { v: "iso", l: "ISO híbrida (live/installer)" },
+          { v: "qcow2", l: "Disco QCOW2 (VM)" },
+          { v: "oci", l: "Imagen OCI (Docker/Podman)" },
+          { v: "wsl", l: "Rootfs WSL (importar en Windows)" },
+        ]
+      : b.engine === "manual"
+        ? []
+        : [
+            { v: "iso", l: "ISO híbrida (live/installer)" },
+            { v: "oci", l: "Imagen OCI (Docker/Podman)" },
+            { v: "wsl", l: "Rootfs WSL (importar en Windows)" },
+          ];
+  const effectiveOut = outOptions.some((o) => o.v === cfg.output)
+    ? cfg.output
+    : outOptions[0]?.v;
+
+  const exportJson = () => {
+    const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${cfg.name}.distroforge.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJson = async (f?: File | null) => {
+    if (!f) return;
+    try {
+      const parsed = JSON.parse(await f.text()) as DistroConfig;
+      if (!parsed || !BASES.some((x) => x.id === parsed.base))
+        throw new Error("base desconocida o fichero no válido");
+      upd({ ...defaultConfig(parsed.base), ...parsed });
+    } catch (e) {
+      alert(`Config inválida: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  return (
+    <section>
+      <h2>5. Construir</h2>
+      <p className="hint">Motor: {b.engine}. Revisa la receta generada y descarga el proyecto.</p>
+      {outOptions.length > 0 ? (
+        <label className="field" style={{ maxWidth: 260 }}>
+          Formato de salida
+          <select
+            value={effectiveOut}
+            onChange={(e) => upd({ output: e.target.value as OutputFormat })}
+          >
+            {outOptions.map((o) => (
+              <option key={o.v} value={o.v}>
+                {o.l}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="hint">
+          Motor manual: el zip incluye lista de paquetes y guía, sin build automático.
+        </p>
+      )}
+      {issues.length > 0 && (
+        <div className="warnings">
+          {issues.map((w, i) => (
+            <div key={i}>· {w}</div>
+          ))}
+        </div>
+      )}
+      <div className="tabs">
+        {names.map((n) => (
+          <button key={n} className={n === current ? "on" : ""} onClick={() => setSel(n)}>
+            {n}
+          </button>
+        ))}
+      </div>
+      <pre className="file">
+        {files[current].startsWith("data:image/")
+          ? `<<wallpaper binario: ${Math.round(files[current].length / 1.37 / 1024)} KB aprox. — se empaqueta dentro del zip>>`
+          : files[current]}
+      </pre>
+      <p style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button
+          className="btn"
+          disabled={busy || issues.length > 0}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await downloadZip(cfg);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Empaquetando..." : `Descargar ${cfg.name}-distroforge.zip`}
+        </button>
+        <button className="btn ghost" onClick={exportJson}>
+          Guardar config (.json)
+        </button>
+        <button className="btn ghost" onClick={() => fileRef.current?.click()}>
+          Cargar config
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            importJson(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </p>
+      <p className="hint">
+        El zip incluye la receta, build.sh (Podman en Linux/WSL2) y un workflow de GitHub
+        Actions para construir la imagen en CI.
+      </p>
+    </section>
+  );
+}
