@@ -16,7 +16,7 @@ if (!BASES.some((b) => b.id === base)) {
 }
 const cfg = defaultConfig(base);
 cfg.system.password = "distroforge-test";
-if (fmtArg === "iso" || fmtArg === "qcow2" || fmtArg === "oci" || fmtArg === "wsl")
+if (fmtArg === "iso" || fmtArg === "qcow2" || fmtArg === "usb" || fmtArg === "vmdk" || fmtArg === "vdi" || fmtArg === "oci" || fmtArg === "wsl")
   cfg.output = fmtArg;
 if (cfgArg) Object.assign(cfg, JSON.parse(readFileSync(cfgArg, "utf8")) as Partial<DistroConfig>);
 const out = outArg ?? `dump-${base}`;

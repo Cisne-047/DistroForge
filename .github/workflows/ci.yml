@@ -21,3 +21,28 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Tests del core
+        run: cargo test -p forge-core
+        working-directory: rust
+      - name: Clippy
+        run: cargo clippy -p forge-core -- -D warnings
+        working-directory: rust
+      - name: CLI
+        run: |
+          cargo build -p forge-cli
+          ./target/debug/forge dump debian /tmp/forge-ci-check iso
+        working-directory: rust

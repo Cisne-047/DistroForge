@@ -46,7 +46,7 @@ export function chrootScript(cfg: DistroConfig): string {
     );
     lines.push(...extraUserShellLines(cfg, group));
   }
-  if (cfg.motd) lines.push(...heredoc("/etc/motd", cfg.motd));
+  if (cfg.motd) lines.push(heredoc("/etc/motd", cfg.motd));
   lines.push(...(cfg.extraFiles ?? []).map((f) => heredoc(f.path, f.content)));
   lines.push(...Object.entries(autologinFiles(cfg)).map(([p, c]) => heredoc(p, c)));
   lines.push(firewallServiceLine(cfg), ...serviceShellLines(cfg));

@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/forge-core",
+    "crates/forge-cli",
+    "crates/forge-wasm",
+]
+# El scaffold de escritorio (Tauri) arrastra un árbol de dependencias pesado y
+# se compila aparte (`cargo build` dentro de rust/tauri-app/src-tauri); se
+# excluye del workspace para que test/build/check del core no lo toquen.
+exclude = ["tauri-app"]

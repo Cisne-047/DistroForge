@@ -799,6 +799,9 @@ describe("bloques 8-11: firewall, share, plantillas, arch, grub, advanced", () =
     const chroot = files["advanced/chroot.sh"];
     expect(chroot).toContain('useradd -m -s /bin/bash -G sudo "user"');
     expect(chroot).toContain("apt install -y htop");
+    // el motd va integro en un heredoc (regresion: se volcaba caracter a caracter)
+    expect(chroot).toContain("<<'DFEOF'");
+    expect(chroot).toContain("Bienvenido a tu distro personalizada");
     expect(files[".github/workflows/build.yml"]).toContain("remaster.sh");
     expect(validate(c)).toEqual([]);
     c.customIso.url = "ftp://mala-url";

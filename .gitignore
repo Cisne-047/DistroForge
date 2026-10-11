@@ -4,3 +4,4 @@ out/
 *.iso
 *.qcow2
 dump-*/
+rust/target/
