@@ -32,6 +32,20 @@ Otros comandos: `npm test` (vitest), `npm run build` (tsc + vite build), `npx vi
 2. **Descargar zip** y súbelo a un repo nuevo de GitHub → *Actions → build → Run workflow* → el artefacto es tu imagen. Sin Docker en local, esta es la vía para tener "tu distro" hoy.
 3. Alternativa local: `bash build.sh` dentro del zip (Linux o WSL2, requiere Podman/Docker).
 
+## Documentación
+
+Manual técnico completo (arquitectura, guía de pasos, cobertura por motor, CI, modo advanced y núcleo Rust) en [docs/DistroForge-Documentacion.pdf](docs/DistroForge-Documentacion.pdf).
+
+## Núcleo en Rust
+
+`rust/` contiene el port del generador a Rust: `forge-core` (librería documentada con tests propios), `forge-cli` (versión de escritorio: `forge dump <base> <dir> [salida] [config.json]`), `forge-wasm` (bindings web) y `tauri-app` (scaffold de app de escritorio). Compilar y probar: `cargo test -p forge-core && cargo build -p forge-cli`.
+
+## Roadmap
+
+- **Paridad SUSE Studio restante:** logo personalizado, EULA de primer arranque, ISO de instalación desatendida (preseed/AutoYaST), estimación de tamaño de imagen.
+- **Requiere backend:** Test Drive VNC real en el navegador y galería pública de distros.
+- **Post-paridad:** firmado de imágenes, resolución de dependencias de paquetes, salidas de nube (AMI/VHD).
+
 ## Seguridad
 
 La contraseña del usuario se incrusta en texto plano dentro de las recetas generadas (así funcionan los kickstart/presets de todos los motores). No publiques repos de proyectos generados con tu contraseña real — los tests de este repo solo usan `distroforge-test`.
