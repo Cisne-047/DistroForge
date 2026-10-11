@@ -125,7 +125,7 @@ WantedBy=multi-user.target
     ...serviceExecStartLines(cfg),
     firewallExecStart(cfg),
     ...(cfg.firewallPorts ?? [])
-      .filter((x) => /^[A-Za-z0-9._-]+(\/\d+(\/(tcp|udp))?)?$/.test(x))
+      .filter((x) => /^([A-Za-z][A-Za-z0-9._-]*|\d+\/(tcp|udp))$/.test(x))
       .map(
         (x) =>
           `ExecStart=/bin/sh -c 'firewall-cmd --permanent --${x.includes("/") ? "add-port" : "add-service"}=${x} || firewall-cmd --${x.includes("/") ? "add-port" : "add-service"}=${x} || true'`

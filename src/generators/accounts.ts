@@ -81,7 +81,7 @@ export function targetShellLine(cfg: DistroConfig): string {
 /** Líneas firewalld para abrir los puertos/servicios elegidos. */
 export function firewallOpenLines(cfg: DistroConfig): string[] {
   return (cfg.firewallPorts ?? [])
-    .filter((x) => /^[A-Za-z0-9._-]+(\/\d+(\/(tcp|udp))?)?$/.test(x))
+    .filter((x) => /^([A-Za-z][A-Za-z0-9._-]*|\d+\/(tcp|udp))$/.test(x))
     .map((x) =>
       x.includes("/")
         ? `firewall-cmd --permanent --add-port=${x} || true`

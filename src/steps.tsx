@@ -10,6 +10,7 @@ type Upd = (patch: Partial<DistroConfig>) => void;
 export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const b = baseById(cfg.base);
   const archs = archsForEngine(b.engine);
+  const desk = b.desktops.find((d) => d.id === cfg.desktop)?.label ?? "—";
   return (
     <section>
       <h2>1. Base</h2>
@@ -49,6 +50,19 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             <span className="tag">motor: {x.engine}</span>
           </button>
         ))}
+      </div>
+      <div className="preview" style={{ margin: "0 0 16px" }}>
+        <div
+          className="desk-mock"
+          style={{ minHeight: 130 }}
+        >
+          <div className="desk-login">
+            <div className="desk-host">{cfg.name || "mi-distro"}</div>
+            <div className="desk-user">{b.label} · {b.engine} · {desk}</div>
+            <div className="desk-motd">x86_64 · salida {cfg.output.toUpperCase()}</div>
+          </div>
+          <div className="desk-note">vista previa</div>
+        </div>
       </div>
       <h3>Escritorio</h3>
       <div className="cards">
