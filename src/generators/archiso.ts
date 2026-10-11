@@ -129,7 +129,17 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 `;
-  for (const name of ["distroforge-users", "distroforge-services"]) {
+  if (sys.locale && sys.locale !== "en_US.UTF-8")
+    accountFiles["archiso/airootfs/etc/systemd/system/distroforge-locale.service"] = `[Unit]
+Description=DistroForge - genera el locale ${sys.locale}
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo "${sys.locale} UTF-8" >> /etc/locale.gen && locale-gen || true'
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+`;
+  for (const name of ["distroforge-users", "distroforge-services", "distroforge-locale"]) {
     if (accountFiles[`archiso/airootfs/etc/systemd/system/${name}.service`])
       accountFiles[`archiso/airootfs/etc/tmpfiles.d/${name}.conf`] =
         `L /etc/systemd/system/multi-user.target.wants/${name}.service - - - - /etc/systemd/system/${name}.service\n`;

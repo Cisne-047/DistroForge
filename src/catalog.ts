@@ -279,7 +279,7 @@ export const BASES: BaseDef[] = [
   },
   {
     id: "fedora",
-    label: "Fedora 41",
+    label: "Fedora 44",
     engine: "kickstart",
     mirror: "https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-41&arch=x86_64",
     desktops: FEDORA_DESKTOPS,
@@ -440,8 +440,21 @@ export const LOCALES = [
 
 export const KEYBOARDS = ["es", "latam", "us", "gb", "de", "fr", "it", "pt"];
 
-export function defaultConfig(base: BaseId): DistroConfig {
-  const b = baseById(base);
+/** Fusiona una config parcial (localStorage, JSON importado, URL) sobre los
+ *  defaults de la base, en profundidad en los objetos anidados. */
+export function mergeConfig(base: BaseId, parsed: Partial<DistroConfig>): DistroConfig {
+  const d = defaultConfig(base);
+  return {
+    ...d,
+    ...parsed,
+    system: { ...d.system, ...(parsed.system ?? {}) },
+    network: { ...d.network, ...(parsed.network ?? {}) },
+    grub: { ...d.grub, ...(parsed.grub ?? {}) },
+    customIso: { ...d.customIso, ...(parsed.customIso ?? {}) },
+  };
+}
+
+export function defaultConfig(base: BaseId): DistroConfig {  const b = baseById(base);
   return {
     name: "mi-distro",
     base,

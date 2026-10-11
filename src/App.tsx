@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DistroConfig } from "./types";
-import { BASES, baseById, defaultConfig } from "./catalog";
+import { BASES, baseById, defaultConfig, mergeConfig } from "./catalog";
 import { decodeConfig } from "./share";
 import { BaseStep, SystemStep, ReposStep, PackagesStep, OutputStep } from "./steps";
 
@@ -21,7 +21,7 @@ function loadConfig(): DistroConfig {
   // 1) config compartida por URL (#hash) tiene prioridad
   if (typeof location !== "undefined" && location.hash.length > 20) {
     const fromHash = decodeConfig(location.hash.slice(1));
-    if (fromHash) return { ...defaultConfig(fromHash.base), ...fromHash };
+    if (fromHash) return mergeConfig(fromHash.base, fromHash);
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -35,7 +35,7 @@ function loadConfig(): DistroConfig {
         Array.isArray(parsed.repos) &&
         parsed.system
       ) {
-        return { ...defaultConfig(parsed.base), ...parsed };
+        return mergeConfig(parsed.base, parsed);
       }
     }
   } catch {
@@ -85,7 +85,7 @@ export default function App() {
     });
   const loadProject = (n: string) => {
     const p = projects[n];
-    if (p) setCfg({ ...defaultConfig(p.base), ...p });
+    if (p) setCfg(mergeConfig(p.base, p));
   };
   const b = baseById(cfg.base);
   const desk = b.desktops.find((d) => d.id === cfg.desktop)?.label ?? "—";

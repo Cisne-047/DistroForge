@@ -3,6 +3,7 @@ import { baseById, desktopPackages, DEB_ARCH, effectiveRepos } from "../catalog"
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import { autologinFiles, extraUserShellLines, firewallServiceLine, serviceShellLines } from "./accounts";
+import { dq, sq } from "./shell";
 import { nmConnection, staticNetwork } from "./network";
 import {
   dconfDbFiles,
@@ -19,13 +20,6 @@ export function sanitizeAlias(a: string, i: number): string {
   return s || `repo-${i + 1}`;
 }
 
-function dq(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\$/g, "\\$")
-    .replace(/`/g, "\\`");
-}
 
 export function livebuildFiles(cfg: DistroConfig): Record<string, string> {
   const base = baseById(cfg.base);
@@ -81,14 +75,15 @@ ${extraUserShellLines(cfg, "sudo").join("\n")}
 SIGNED="[signed-by=/usr/share/keyrings/${alias}.asc]"`
       : `SIGNED="[trusted=yes]"`;
     const debLine = r.suite
-      ? `echo "deb $SIGNED ${r.url} ${r.suite}" > /etc/apt/sources.list.d/distroforge-${alias}.list`
-      : `echo "deb $SIGNED ${r.url} ./" > /etc/apt/sources.list.d/distroforge-${alias}.list`;
+      ? sq(`deb $SIGNED ${r.url} ${r.suite}`)
+      : sq(`deb $SIGNED ${r.url} ./`);
     return `#!/bin/sh
 set -e
 # DistroForge - repo custom: ${alias}
 mkdir -p /usr/share/keyrings
 ${keyLines}
-${debLine}
+printf '%s
+' ${debLine} > /etc/apt/sources.list.d/distroforge-${alias}.list
 `;
   });
 

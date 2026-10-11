@@ -1,8 +1,8 @@
 import type { DistroConfig } from "../types";
 import { baseById, desktopPackages, effectiveRepos } from "../catalog";
 import { flatpakPackages, hasFlatpakApps } from "./flatpak";
-import { dirnameOf } from "./kickstart";
 import { sanitizeAlias } from "./livebuild";
+import { sq, dirnameOf } from "./shell";
 
 /** Imagen base OCI para cada distro (salida "oci"). */
 const BASE_IMAGE: Record<string, string> = {
@@ -12,7 +12,7 @@ const BASE_IMAGE: Record<string, string> = {
   elementary: "ubuntu:24.04",
   pop: "ubuntu:22.04",
   zorin: "ubuntu:24.04",
-  fedora: "fedora:41",
+  fedora: "fedora:latest",
   "opensuse-tumbleweed": "opensuse/tumbleweed",
   "opensuse-leap": "opensuse/leap:15.6",
   arch: "archlinux:latest",
@@ -20,8 +20,11 @@ const BASE_IMAGE: Record<string, string> = {
   cachyos: "archlinux:latest",
 };
 
-function sq(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`;
+/** Grupo de admin que existe de verdad en cada familia (sudo no existe fuera de Debian). */
+function adminGroupOf(engine: string): string {
+  if (engine === "livebuild") return "sudo";
+  if (engine === "kiwi") return "users";
+  return "wheel"; // mkarchiso y kickstart
 }
 
 export function dockerfileFiles(cfg: DistroConfig): Record<string, string> {
@@ -43,7 +46,7 @@ export function dockerfileFiles(cfg: DistroConfig): Record<string, string> {
   const extraUsers = (cfg.users ?? [])
     .map(
       (u) =>
-        `    id "${u.name}" >/dev/null 2>&1 || useradd -m -s /bin/bash${u.admin ? " -G sudo" : ""} "${u.name}"; \\
+        `    id "${u.name}" >/dev/null 2>&1 || useradd -m -s /bin/bash${u.admin ? ` -G ${adminGroupOf(engine)}` : ""} "${u.name}"; \\
     echo ${sq(`${u.name}:${u.password}`)} | chpasswd; \\`
     )
     .join("\n")
@@ -70,7 +73,7 @@ export function dockerfileFiles(cfg: DistroConfig): Record<string, string> {
         return `    echo ${sq(src)} > /etc/apt/sources.list.d/distroforge-${alias}.list; \\`;
       })
       .join("\n");
-    run = `RUN set -eux; \\
+    run = `RUN set -eu; \\
     apt-get update; \\
     apt-get install -y --no-install-recommends wget ca-certificates; \\
 ${keyLines ? keyLines + "\n" : ""}${repoLines ? repoLines + "\n" : ""}    apt-get update; \\
@@ -78,28 +81,48 @@ ${keyLines ? keyLines + "\n" : ""}${repoLines ? repoLines + "\n" : ""}    apt-ge
     apt-get clean; \\
     rm -rf /var/lib/apt/lists/*; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G sudo ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \
+${extraUsers}` : ""}`;
   } else if (engine === "mkarchiso") {
     const repoLines = repos
       .map(
-        (r) =>
-          `    printf '[${r.alias}]\\nSigLevel = Optional TrustAll\\nServer = ${r.url}\\n' >> /etc/pacman.conf; \\`
+        (r, i) =>
+          `    printf '[%s]\\nSigLevel = Optional TrustAll\\nServer = %s\\n' "${sanitizeAlias(r.alias, i)}" "${r.url}" >> /etc/pacman.conf; \\`
       )
       .join("\n");
-    run = `RUN set -eux; \\
-${repoLines ? repoLines + "\n" : ""}    pacman -Syu --noconfirm ${["sudo", ...pkgs].join(" ")}; \\
+    // Manjaro OCI parte de la imagen Arch pero con sus propios repos
+    const baseRepo =
+      cfg.base === "manjaro" && base.mirror
+        ? `    printf '[manjaro]\\nSigLevel = Optional TrustAll\\nServer = %s\\n' "${base.mirror}" >> /etc/pacman.conf; \\\n`
+        : "";
+    run = `RUN set -eu; \\
+${baseRepo}${repoLines ? repoLines + "\n" : ""}    pacman -Syu --noconfirm ${["sudo", ...pkgs].join(" ")}; \\
     pacman -Scc --noconfirm; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G wheel ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
+    echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/10-distroforge; \\
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \
+${extraUsers}` : ""}`;
   } else if (engine === "kiwi") {
-    run = `RUN zypper --gpg-auto-import-keys --non-interactive install ${pkgs.join(" ")}; \\
+    const repoLines = repos
+      .map((r) => `    zypper --non-interactive ar --gpg-auto-import-keys "${r.url}" "${r.alias}"; \\`)
+      .join("\n");
+    run = `RUN set -eu; \\
+${repoLines ? repoLines + "\n" : ""}    zypper --gpg-auto-import-keys --non-interactive install ${pkgs.join(" ")}; \\
 ${flatpakRun}    useradd -m -s /bin/bash -G users ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
+    echo "${sys.username} ALL=(ALL) ALL" > /etc/sudoers.d/50-distroforge; \\
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \
+${extraUsers}` : ""}`;
   } else {
-    run = `RUN dnf install -y ${pkgs.join(" ")}; \\
+    const repoLines = repos
+      .map((r) => `    dnf config-manager --add-repo=${r.url}; \\`)
+      .join("\n");
+    run = `RUN set -eu; \\
+    dnf -y install dnf-plugins-core; \\
+${repoLines ? repoLines + "\n" : ""}    dnf install -y ${pkgs.join(" ")}; \\
 ${flatpakRun}    dnf clean all; \\
     useradd -m -s /bin/bash -G wheel ${sys.username}; \\
-    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \\\n${extraUsers}` : ""}`;
+    echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd${extraUsers ? `; \
+${extraUsers}` : ""}`;
   }
 
   const dockerfile = `FROM ${image}

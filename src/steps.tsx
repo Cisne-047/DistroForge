@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, ServiceToggle, SystemConfig } from "./types";
-import { BASES, baseById, archsForEngine, defaultConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
+import { BASES, baseById, archsForEngine, mergeConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
 import { TEMPLATES, applyTemplate } from "./templates";
 import { shareUrl } from "./share";
 import { generateProject, validate, downloadZip } from "./generators";
@@ -616,7 +616,7 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
       const parsed = JSON.parse(await f.text()) as DistroConfig;
       if (!parsed || !BASES.some((x) => x.id === parsed.base))
         throw new Error("base desconocida o fichero no válido");
-      upd({ ...defaultConfig(parsed.base), ...parsed });
+      upd(mergeConfig(parsed.base, parsed));
     } catch (e) {
       alert(`Config inválida: ${e instanceof Error ? e.message : e}`);
     }

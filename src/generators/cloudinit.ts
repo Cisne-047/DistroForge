@@ -3,7 +3,8 @@ import type { DistroConfig } from "../types";
 export const CLOUD_INIT_PACKAGE = "cloud-init";
 
 function esc(s: string): string {
-  return s.replace(/"/g, '\\"');
+  // backslash primero: si no, "c:\" acabaría como "c:\\" (YAML inválido)
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 export function cloudInitYaml(cfg: DistroConfig): string {

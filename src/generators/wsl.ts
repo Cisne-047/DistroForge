@@ -1,12 +1,9 @@
 import type { DistroConfig } from "../types";
 import { baseById, DEB_ARCH, desktopPackages, effectiveRepos } from "../catalog";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
-import { dirnameOf } from "./kickstart";
 import { sanitizeAlias } from "./livebuild";
+import { sq, dirnameOf } from "./shell";
 
-function sq(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`;
-}
 
 function wslConf(cfg: DistroConfig): string {
   return `[automount]
@@ -38,7 +35,7 @@ export function wslFiles(cfg: DistroConfig): Record<string, string> {
     .map(
       (u) =>
         `chroot /rootfs id "${u.name}" >/dev/null 2>&1 || chroot /rootfs useradd -m -s /bin/bash${u.admin ? " -G wheel" : ""} "${u.name}"
-chroot /rootfs bash -c "echo ${sq(`${u.name}:${u.password}`)} | chpasswd"`
+echo ${sq(`${u.name}:${u.password}`)} | chroot /rootfs chpasswd`
     )
     .join("\n");
   const wslServiceLines = (cfg.services ?? [])
@@ -79,7 +76,7 @@ chroot /rootfs bash -c "echo ${sq(`${u.name}:${u.password}`)} | chpasswd"`
       })
       .join("\n");
     script = `#!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
 # DistroForge - rootfs WSL para ${base.label} (debootstrap)
 ${ensureBootstrap}
 rm -rf /rootfs && mkdir -p /rootfs
@@ -88,7 +85,7 @@ ${repoLines}
 chroot /rootfs apt-get update
 chroot /rootfs env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G sudo ${sys.username}
-chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
+echo ${sq(`${sys.username}:${sys.password}`)} | chroot /rootfs chpasswd
 ${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
@@ -102,14 +99,14 @@ echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
       )
       .join("\n");
     script = `#!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
 # DistroForge - rootfs WSL para ${base.label} (pacstrap)
 pacman -Sy --noconfirm arch-install-scripts
 rm -rf /rootfs && mkdir -p /rootfs
 ${repoLines}
 pacstrap -c /rootfs base sudo ${pkgs.join(" ")}
 arch-chroot /rootfs useradd -m -s /bin/bash -G wheel ${sys.username}
-arch-chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
+arch-echo ${sq(`${sys.username}:${sys.password}`)} | chroot /rootfs chpasswd
 ${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
@@ -120,27 +117,40 @@ echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
       .map((r) => `zypper --installroot /rootfs ar -f ${r.url} ${r.alias}`)
       .join("\n");
     script = `#!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
 # DistroForge - rootfs WSL para ${base.label} (zypper installroot)
 rm -rf /rootfs && mkdir -p /rootfs
 zypper --installroot /rootfs ar -f ${base.mirror} distroforge-base
 ${repoLines}
 zypper --installroot /rootfs --no-gpg-checks -n install filesystem zypper sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G users ${sys.username}
-chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
+echo ${sq(`${sys.username}:${sys.password}`)} | chroot /rootfs chpasswd
 ${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .
 echo "Rootfs WSL listo en ./out/${name}-wsl.tar"
 `;
   } else {
+    const repoLines = repos
+      .map(
+        (r, i) =>
+          `mkdir -p /rootfs/etc/yum.repos.d
+cat > /rootfs/etc/yum.repos.d/distroforge-${i}.repo <<'EOF'
+[distroforge-${i}]
+name=distroforge-${i}
+baseurl=${r.url}
+enabled=1
+gpgcheck=0
+EOF`
+      )
+      .join("\n");
     script = `#!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
 # DistroForge - rootfs WSL para ${base.label} (dnf installroot)
 rm -rf /rootfs && mkdir -p /rootfs
-dnf install -y --installroot=/rootfs --releasever=41 --setopt=install_weak_deps=False --nodocs @core sudo ${pkgs.join(" ")}
+${repoLines ? repoLines + "\n" : ""}dnf install -y --installroot=/rootfs --releasever=44 --setopt=install_weak_deps=False --nodocs @core sudo ${pkgs.join(" ")}
 chroot /rootfs useradd -m -s /bin/bash -G wheel ${sys.username}
-chroot /rootfs bash -c "echo ${sq(`${sys.username}:${sys.password}`)} | chpasswd"
+echo ${sq(`${sys.username}:${sys.password}`)} | chroot /rootfs chpasswd
 ${preConf ? preConf + "\n" : ""}${confLines}
 mkdir -p out
 tar -C /rootfs -cpf out/${name}-wsl.tar .

@@ -121,6 +121,20 @@ export function validate(cfg: DistroConfig): string[] {
     out.push("Arquitectura: armhf/i386 en OCI/WSL es experimental.");
   if (cfg.grub && (!Number.isFinite(cfg.grub.timeout) || cfg.grub.timeout < 0 || cfg.grub.timeout > 999))
     out.push("GRUB: timeout inválido (0-999 segundos).");
+  if (cfg.output === "oci" || cfg.output === "wsl") {
+    const dropped = [
+      cfg.motd && "MOTD",
+      cfg.wallpaper && "wallpaper",
+      cfg.cloudInit && "cloud-init",
+      cfg.autologin && "auto-login",
+      cfg.network?.mode === "static" && "red estática",
+      (cfg.services?.length ?? 0) > 0 && "servicios systemd",
+    ].filter(Boolean);
+    if (dropped.length)
+      out.push(
+        `Salida ${cfg.output.toUpperCase()}: se ignoran ${dropped.join(", ")} (no aplican a contenedor/WSL).`
+      );
+  }
   if (cfg.advanced) {
     const url = cfg.customIso?.url ?? "";
     if (!/^https?:\/\/.+/i.test(url)) out.push("Advanced: falta la URL de la ISO base (http/https).");

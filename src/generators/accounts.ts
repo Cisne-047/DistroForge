@@ -1,5 +1,6 @@
 import type { DistroConfig } from "../types";
 import { desktopPackages } from "../catalog";
+import { dq, systemdSafe } from "./shell";
 
 /** Línea shell para el firewall (firewalld); tolerante si no está instalado. */
 export function firewallServiceLine(cfg: DistroConfig): string {
@@ -25,8 +26,8 @@ export function extraUserShellLines(
 ): string[] {
   return (cfg.users ?? []).map((u) => {
     const groups = u.admin ? ` -G ${adminGroup}` : "";
-    return `id "${u.name}" >/dev/null 2>&1 || useradd -m -s /bin/bash${groups} "${u.name}"
-echo "${u.name}:${u.password.replace(/"/g, '\\"')}" | chpasswd`;
+    return `id "${dq(u.name)}" >/dev/null 2>&1 || useradd -m -s /bin/bash${groups} "${dq(u.name)}"
+echo "${dq(u.name)}:${dq(u.password)}" | chpasswd`;
   });
 }
 
@@ -49,7 +50,7 @@ export function userExecStartLines(
 ): string[] {
   return (cfg.users ?? []).map(
     (u) =>
-      `ExecStart=/bin/sh -c 'id "${u.name}" >/dev/null 2>&1 || useradd -m -s /bin/bash${u.admin ? ` -G ${adminGroup}` : ""} "${u.name}"; echo "${u.name}:${u.password.replace(/"/g, '\\"')}" | chpasswd'`
+      `ExecStart=/bin/sh -c 'id "${systemdSafe(u.name)}" >/dev/null 2>&1 || useradd -m -s /bin/bash${u.admin ? ` -G ${adminGroup}` : ""} "${systemdSafe(u.name)}"; echo "${systemdSafe(u.name)}:${systemdSafe(u.password)}" | chpasswd'`
   );
 }
 

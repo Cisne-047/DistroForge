@@ -79,10 +79,10 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
   </preferences>
   <users>
 ${[
-    `    <user name="${esc(sys.username)}" password="${esc(sys.password)}" home="/home/${esc(sys.username)}" groups="users"/>`,
+    `    <user name="${esc(sys.username)}" password="${esc(sys.password)}" home="/home/${esc(sys.username)}" groups="users" pwdformat="plain"/>`,
     ...(cfg.users ?? []).map(
       (u) =>
-        `    <user name="${esc(u.name)}" password="${esc(u.password)}" home="/home/${esc(u.name)}" groups="users${u.admin ? ",wheel" : ""}"/>`
+        `    <user name="${esc(u.name)}" password="${esc(u.password)}" home="/home/${esc(u.name)}" groups="users${u.admin ? ",wheel" : ""}" pwdformat="plain"/>`
     ),
   ].join("\n")}
   </users>

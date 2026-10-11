@@ -156,7 +156,7 @@ describe("generateProject", () => {
     c.output = "oci";
     const df = generateProject(c)["Dockerfile"];
     expect(df).toContain("FROM archlinux:latest");
-    expect(df).toContain("[cachyos]");
+    expect(df).toContain('"cachyos"'); // printf %s con el alias saneado
   });
 
   it("cloud-init y MOTD llegan a la receta live-build", () => {
@@ -212,7 +212,7 @@ describe("generateProject", () => {
     const d = cfgFor("debian");
     d.output = "wsl";
     const fd = generateProject(d);
-    expect(fd["wsl/rootfs.sh"]).toContain("debootstrap --variant=minbase bookworm");
+    expect(fd["wsl/rootfs.sh"]).toContain("debootstrap --variant=minbase --arch=amd64 bookworm");
     expect(fd["wsl/rootfs.sh"]).toContain("default = user");
     expect(fd["wsl/rootfs.sh"]).toContain("systemd = true");
     expect(fd["build.sh"]).toContain("wsl/rootfs.sh");
@@ -383,7 +383,7 @@ describe("bloque 4: flatpak y ficheros extra", () => {
     const ks = generateProject(appCfg("fedora"))["fedora/ks.cfg"];
     expect(ks).toContain("flatpak");
     expect(ks).toContain("mkdir -p /etc/skel");
-    expect(ks).toContain("cat > /etc/skel/.bashrc <<'DFEOF'");
+    expect(ks).toContain("cat > /etc/skel/.bashrc <<'DFEOF0'");
     expect(ks).toContain("export EDITOR=vim");
   });
 
@@ -548,10 +548,10 @@ describe("bloque 6: paridad SUSE Studio (usuarios, servicios, autologin, formato
     const c = studioCfg("fedora");
     c.desktop = "gnome";
     const ks = generateProject(c)["fedora/ks.cfg"];
-    expect(ks).toContain("user --name=ana --password=ana12345 --plaintext --groups=wheel");
-    expect(ks).toContain("user --name=pepe --password=pepe12345 --plaintext");
+    expect(ks).toContain('user --name=ana --password="ana12345" --plaintext --groups=wheel');
+    expect(ks).toContain('user --name=pepe --password="pepe12345" --plaintext');
     expect(ks).toContain('systemctl enable "sshd.service"');
-    expect(ks).toContain("cat > /etc/gdm/custom.conf <<'DFEOF'");
+    expect(ks).toContain("cat > /etc/gdm/custom.conf <<'DFEOF0'");
   });
 
   it("OCI y WSL: usuarios extra y servicios con chroot", () => {
@@ -711,7 +711,7 @@ describe("bloques 8-11: firewall, share, plantillas, arch, grub, advanced", () =
     const kiosk = TEMPLATES.find((t) => t.id === "kiosk")!;
     const mint = applyTemplate(cfgFor("mint"), kiosk);
     expect(mint.autologin).toBe(true);
-    expect(mint.desktop).toBe("cinnamon");
+    expect(mint.desktop).toBe("none"); // mint no tiene "gnome": se conserva el escritorio actual
     expect(applyTemplate(cfgFor("arch"), kiosk).desktop).toBe("gnome");
     const wsl = applyTemplate(cfgFor("debian"), TEMPLATES.find((t) => t.id === "wsldev")!);
     expect(wsl.output).toBe("wsl");

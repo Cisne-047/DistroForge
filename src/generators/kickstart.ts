@@ -2,21 +2,18 @@ import type { DistroConfig } from "../types";
 import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
+import { sanitizeAlias } from "./livebuild";
 import { autologinFiles, serviceShellLines } from "./accounts";
 import { dottedMask, staticNetwork } from "./network";
-
-export function dirnameOf(p: string): string {
-  const d = p.replace(/\/[^/]*$/, "");
-  return d || "/";
-}
+import { dirnameOf } from "./shell";
 
 /** Bloque %post que vuelca cada fichero extra con heredoc (rutas absolutas). */
 export function extraFilePostLines(extraFiles: { path: string; content: string }[]): string[] {
-  return (extraFiles ?? []).flatMap((f) => [
+  return (extraFiles ?? []).flatMap((f, i) => [
     `mkdir -p ${dirnameOf(f.path)}`,
-    `cat > ${f.path} <<'DFEOF'`,
+    `cat > ${f.path} <<'DFEOF${i}'`,
     f.content,
-    "DFEOF",
+    `DFEOF${i}`,
   ]);
 }
 
@@ -25,7 +22,7 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
   const repos = effectiveRepos(cfg);
 
   const repoLines = repos
-    .map((r) => `repo --name="${r.alias}" --baseurl="${r.url}" --nogpgcheck`)
+    .map((r) => `repo --name="${sanitizeAlias(r.alias, 0)}" --baseurl="${r.url}" --nogpgcheck`)
     .join("\n");
 
   const postLines = [
@@ -67,11 +64,11 @@ keyboard --vckeymap=${sys.keyboard} --xlayouts='${sys.keyboard}'
 timezone ${sys.timezone} --utc
 ${netLine}
 rootpw --lock
-user --name=${sys.username} --password=${sys.password} --plaintext --groups=wheel
+user --name=${sys.username} --password="${sys.password}" --plaintext --groups=wheel
 ${(cfg.users ?? [])
   .map(
     (u) =>
-      `user --name=${u.name} --password=${u.password} --plaintext${u.admin ? " --groups=wheel" : ""}`
+      `user --name=${u.name} --password="${u.password}" --plaintext${u.admin ? " --groups=wheel" : ""}`
   )
   .join("\n")}
 firstboot --disable
@@ -96,7 +93,7 @@ set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 podman run --rm --privileged -v "$DIR":/project -v "$DIR/out":/out fedora:latest bash -ec '
   dnf install -y livemedia-creator
-  livemedia-creator --no-virt --make-iso --ks /project/fedora/ks.cfg --releasever 41 --iso-only --iso-name ${cfg.name}.iso --resultdir /out
+  livemedia-creator --no-virt --make-iso --ks /project/fedora/ks.cfg --releasever 44 --iso-only --iso-name ${cfg.name}.iso --resultdir /out
 '
 echo "Imagen lista en ./out/${cfg.name}.iso"
 `;
