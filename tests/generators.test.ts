@@ -841,3 +841,28 @@ describe("bloque 12b: autostart, puertos firewall y target de arranque", () => {
     ).toContain("set-default graphical.target");
   });
 });
+
+describe("bloque 15: modpacks estilo Prism", () => {
+  it("applyPack añade paquetes y flatpaks sin duplicar; respeta escritorio", async () => {
+    const { applyPack, PACKS } = await import("../src/packs");
+    const c = cfgFor("mint"); // mint no tiene kde
+    c.packages = ["steam"];
+    c.flatpakApps = ["com.valvesoftware.Steam"];
+    const gaming = PACKS.find((p) => p.id === "gaming")!;
+    const out = applyPack(c, gaming);
+    expect(out.packages.filter((p) => p === "steam").length).toBe(1);
+    expect(out.packages).toContain("lutris");
+    expect(out.flatpakApps.filter((a) => a === "com.valvesoftware.Steam").length).toBe(1);
+    expect(out.flatpakApps).toContain("net.lutris.Lutris");
+    expect(validate(out)).toEqual([]);
+  });
+
+  it("parsePack acepta JSON plano, envuelto en {pack} y rechaza basura", async () => {
+    const { parsePack } = await import("../src/packs");
+    const flat = parsePack('{"name":"mio","packages":["vim"]}');
+    expect(flat.packages).toEqual(["vim"]);
+    const wrapped = parsePack('{"pack":{"name":"mio2","packages":["git"],"flatpakApps":["org.x.Y"]}}');
+    expect(wrapped.flatpakApps).toEqual(["org.x.Y"]);
+    expect(() => parsePack('{"nombre":"x"}')).toThrow(/packages/);
+  });
+});

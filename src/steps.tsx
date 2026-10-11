@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, ServiceToggle, SystemConfig } from "./types";
 import { BASES, baseById, archsForEngine, mergeConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
 import { TEMPLATES, applyTemplate } from "./templates";
+import { PACKS, applyPack, parsePack, type Pack } from "./packs";
 import { shareUrl } from "./share";
 import { generateProject, validate, downloadZip } from "./generators";
 
@@ -703,6 +704,8 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [fdraft, setFdraft] = useState("");
+  const [packDraft, setPackDraft] = useState("");
+  const [packApplied, setPackApplied] = useState<string | null>(null);
   const b = baseById(cfg.base);
   const flatpak = cfg.flatpakApps ?? [];
   const sugg = b.suggestions.filter(
@@ -723,6 +726,26 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
     const a = fdraft.trim();
     if (a && !flatpak.includes(a)) upd({ flatpakApps: [...flatpak, a] });
     setFdraft("");
+  };
+  const applyPackDraft = async () => {
+    const src = packDraft.trim();
+    if (!src) return;
+    try {
+      let pk: Pack;
+      if (/^https?:\/\//.test(src)) {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        pk = parsePack(await res.text());
+      } else {
+        pk = parsePack(src);
+      }
+      upd(applyPack(cfg, pk));
+      setPackApplied(pk.name);
+      setPackDraft("");
+      setTimeout(() => setPackApplied(null), 3000);
+    } catch (e) {
+      alert(`Pack inválido: ${e instanceof Error ? e.message : e}`);
+    }
   };
   return (
     <section>
@@ -792,6 +815,44 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           </button>
         ))}
         {flatpak.length === 0 && <span className="hint">Ninguna todavía.</span>}
+      </div>
+      <h3>Modpacks (estilo Prism Launcher)</h3>
+      <p className="hint">
+        Colecciones listas que se aplican de forma aditiva sobre tus paquetes. Haz clic para
+        añadir el pack completo.
+        {packApplied && (
+          <span className="tag" style={{ marginLeft: 8, borderColor: "var(--acc-2)", color: "var(--acc-2)" }}>
+            pack «{packApplied}» aplicado
+          </span>
+        )}
+      </p>
+      <div className="cards">
+        {PACKS.map((pk) => (
+          <button
+            key={pk.id}
+            className="card clickable"
+            title={pk.desc}
+            onClick={() => upd(applyPack(cfg, pk))}
+          >
+            <strong>{pk.name}</strong>
+            <span className="tag">{pk.packages.length} paquetes{pk.flatpakApps?.length ? ` + ${pk.flatpakApps.length} flatpak` : ""}</span>
+            <span className="hint" style={{ margin: 0 }}>{pk.desc}</span>
+          </button>
+        ))}
+      </div>
+      <div className="fields" style={{ marginTop: 12 }}>
+        <label className="field" style={{ gridColumn: "1 / -1" }}>
+          Importar pack (URL JSON o pega el JSON y pulsa Enter)
+          <input
+            value={packDraft}
+            placeholder="https://.../pack.json o {&quot;name&quot;: ..., &quot;packages&quot;: [...]}"
+            onChange={(e) => setPackDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              applyPackDraft();
+            }}
+          />
+        </label>
       </div>
     </section>
   );
