@@ -7,6 +7,93 @@ import { generateProject, validate, downloadZip } from "./generators";
 
 type Upd = (patch: Partial<DistroConfig>) => void;
 
+type ChromeKind = "gnome" | "panel" | "tiling" | "terminal";
+
+function chromeOf(desktopId: string): ChromeKind {
+  if (["gnome", "zorincore", "popgnome", "pantheon", "cosmic", "budgie"].includes(desktopId))
+    return "gnome";
+  if (["kde", "xfce", "mate", "lxqt", "cinnamon"].includes(desktopId)) return "panel";
+  if (["i3", "sway"].includes(desktopId)) return "tiling";
+  return "terminal"; // "none" y desconocidos
+}
+
+/** Mock del escritorio recién instalado, según familia: top bar + dock (GNOME),
+ *  taskbar inferior (KDE/Xfce/...), barra de workspaces (i3/Sway) o TTY (servidor). */
+function DesktopPreview({
+  desktopId,
+  hostname,
+  username,
+  motd,
+  wallpaper,
+  label,
+}: {
+  desktopId: string;
+  hostname: string;
+  username: string;
+  motd?: string;
+  wallpaper?: string;
+  label: string;
+}) {
+  const kind = chromeOf(desktopId);
+  const host = hostname || "mi-distro";
+  const user = username || "user";
+  const bg = wallpaper ? { backgroundImage: `url(${wallpaper})`, backgroundSize: "cover" } : undefined;
+  if (kind === "terminal")
+    return (
+      <div className="desk-mock dp-term" style={bg}>
+        <div className="dp-term-body">
+          <div>{host} login: {user}</div>
+          <div>Password:</div>
+          <div className="dp-dim">Last login: {new Date().toDateString()} on tty1</div>
+          {motd && <div className="dp-motd">{motd}</div>}
+          <div>{user}@{host}:~$ _</div>
+        </div>
+        <div className="desk-note">{label}</div>
+      </div>
+    );
+  return (
+    <div className="desk-mock" style={bg}>
+      {kind === "gnome" && (
+        <>
+          <div className="dp-topbar">
+            <span>Actividades</span>
+            <span className="dp-clock">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            <span>⌗ ▤ ⏻</span>
+          </div>
+          <div className="dp-dock">
+            {["🌐", "📁", "✉", "⚙", "📋"].map((i, n) => (
+              <span key={n} className="dp-icon">{i}</span>
+            ))}
+          </div>
+        </>
+      )}
+      {kind === "panel" && (
+        <div className="dp-panel">
+          <span className="dp-start">◆</span>
+          <span className="dp-task">🌐 {label}</span>
+          <span className="dp-task dp-dim">terminal</span>
+          <span className="dp-clock">🔊 🔔 {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+      )}
+      {kind === "tiling" && (
+        <div className="dp-tile">
+          <div className="dp-win">1: {label}</div>
+          <div className="dp-win">2: terminal</div>
+        </div>
+      )}
+      {kind === "tiling" && <div className="dp-wsbar">1 2 3 4 5 · {host}</div>}
+      {kind !== "tiling" && (
+        <div className="desk-login">
+          <div className="desk-host">{host}</div>
+          <div className="desk-user">{user}@{host}:~$</div>
+          {motd && <div className="desk-motd">{motd}</div>}
+        </div>
+      )}
+      <div className="desk-note">{label}</div>
+    </div>
+  );
+}
+
 export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const b = baseById(cfg.base);
   const archs = archsForEngine(b.engine);
@@ -52,17 +139,17 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         ))}
       </div>
       <div className="preview" style={{ margin: "0 0 16px" }}>
-        <div
-          className="desk-mock"
-          style={{ minHeight: 130 }}
-        >
-          <div className="desk-login">
-            <div className="desk-host">{cfg.name || "mi-distro"}</div>
-            <div className="desk-user">{b.label} · {b.engine} · {desk}</div>
-            <div className="desk-motd">x86_64 · salida {cfg.output.toUpperCase()}</div>
-          </div>
-          <div className="desk-note">vista previa</div>
-        </div>
+        <DesktopPreview
+          desktopId={cfg.desktop}
+          hostname={cfg.system.hostname}
+          username={cfg.system.username}
+          wallpaper={cfg.wallpaper || undefined}
+          label={`${b.label} · ${desk} · ${cfg.arch}`}
+        />
+        <span className="hint">
+          Así arrancará una instalación limpia con esta base y este escritorio
+          (salida {cfg.output.toUpperCase()}).
+        </span>
       </div>
       <h3>Escritorio</h3>
       <div className="cards">
@@ -538,27 +625,14 @@ export function BrandingStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
               Use ↑ y ↓ para seleccionar… timeout: {Math.max(0, timeout)}s
             </div>
           </div>
-          <div
-            className="desk-mock"
-            style={
-              cfg.wallpaper
-                ? {
-                    backgroundImage: `url(${cfg.wallpaper})`,
-                    backgroundSize: "cover",
-                  }
-                : undefined
-            }
-          >
-            <div className="desk-login">
-              <div className="desk-host">{cfg.system.hostname}</div>
-              <div className="desk-user">
-                {cfg.system.username || "user"}@{cfg.system.hostname}:~$
-              </div>
-              {cfg.motd && <div className="desk-motd">{cfg.motd}</div>}
-              {cfg.autologin && <div className="desk-badge">auto-login activo</div>}
-            </div>
-            <div className="desk-note">{b.label}</div>
-          </div>
+          <DesktopPreview
+            desktopId={cfg.desktop}
+            hostname={cfg.system.hostname}
+            username={cfg.system.username}
+            motd={cfg.motd}
+            wallpaper={cfg.wallpaper || undefined}
+            label={b.label}
+          />
         </div>
       </div>
     </section>
