@@ -7,3 +7,6 @@ dump-*/
 rust/target/
 server/node_modules/
 server/dist/
+rust/server-rs/target/
+rust/web-ui/target/
+rust/web-ui/dist/
