@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, ServiceToggle, SystemConfig } from "./types";
 import { BASES, baseById, archsForEngine, mergeConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
 import { TEMPLATES, applyTemplate } from "./templates";
 import { PACKS, applyPack, parsePack, type Pack } from "./packs";
+import { api, getServerUrl, setServerUrl, type ServerPack } from "./serverClient";
 import { estimateSizeMB } from "./generators";
 import { shareUrl } from "./share";
 import { generateProject, validate, downloadZip } from "./generators";
@@ -793,6 +794,17 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const [packApplied, setPackApplied] = useState<string | null>(null);
   const [gallery, setGallery] = useState<{ file: string; name: string; desc: string }[]>([]);
   const [galleryQuery, setGalleryQuery] = useState("");
+  const [srvUrl, setSrvUrl] = useState(getServerUrl());
+  const [me, setMe] = useState<string | null>(null);
+  const [cred, setCred] = useState({ name: "", password: "" });
+  const [serverPacks, setServerPacks] = useState<ServerPack[] | null>(null);
+  const [serverQuery, setServerQuery] = useState("");
+
+  const refreshMe = () => api.me().then((r) => setMe(r.user?.name ?? null)).catch(() => setMe(null));
+  useEffect(() => {
+    if (getServerUrl()) refreshMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const b = baseById(cfg.base);
   const flatpak = cfg.flatpakApps ?? [];
   const sugg = b.suggestions.filter(
@@ -988,6 +1000,187 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           </button>
         ))}
       </div>
+      <h3>Servidor DistroForge (opcional)</h3>
+      <p className="hint">
+        Conecta un servidor (ver <code>server/</code> del repo) para cuentas, búsqueda server-side
+        y Test Drive VNC interactivo. Sin él, todo lo demás sigue funcionando igual.
+      </p>
+      <div className="fields">
+        <label className="field">
+          URL del servidor
+          <input
+            value={srvUrl}
+            placeholder="http://localhost:8080"
+            onChange={(e) => setSrvUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setServerUrl(srvUrl);
+                refreshMe();
+              }
+            }}
+          />
+        </label>
+        {me ? (
+          <>
+            <span className="tag" style={{ alignSelf: "end", padding: "8px 12px" }}>
+              conectado como {me}
+            </span>
+            <button
+              className="btn ghost small"
+              style={{ alignSelf: "end" }}
+              onClick={() => api.logout().then(refreshMe).catch(() => {})}
+            >
+              Salir
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="field">
+              Usuario
+              <input value={cred.name} onChange={(e) => setCred({ ...cred, name: e.target.value })} />
+            </label>
+            <label className="field">
+              Contraseña
+              <input
+                type="password"
+                value={cred.password}
+                onChange={(e) => setCred({ ...cred, password: e.target.value })}
+              />
+            </label>
+            <div style={{ display: "flex", gap: 8, alignSelf: "end" }}>
+              <button
+                className="btn small"
+                onClick={async () => {
+                  try {
+                    await api.login(cred.name, cred.password);
+                    refreshMe();
+                  } catch (e) {
+                    alert("Login: " + (e instanceof Error ? e.message : e));
+                  }
+                }}
+              >
+                Entrar
+              </button>
+              <button
+                className="btn ghost small"
+                onClick={async () => {
+                  try {
+                    await api.register(cred.name, cred.password);
+                    refreshMe();
+                  } catch (e) {
+                    alert("Registro: " + (e instanceof Error ? e.message : e));
+                  }
+                }}
+              >
+                Crear cuenta
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      {me && (
+        <>
+          <div className="fields" style={{ marginTop: 10 }}>
+            <label className="field">
+              Búsqueda server-side (FTS5)
+              <input
+                value={serverQuery}
+                placeholder="steam, nas, multimedia..."
+                onChange={(e) => setServerQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")
+                    api
+                      .search(serverQuery)
+                      .then((r) => setServerPacks(r.packs))
+                      .catch((err) => alert(err instanceof Error ? err.message : String(err)));
+                }}
+              />
+            </label>
+            <button
+              className="btn ghost small"
+              style={{ alignSelf: "end" }}
+              onClick={() =>
+                api
+                  .search(serverQuery)
+                  .then((r) => setServerPacks(r.packs))
+                  .catch((err) => alert(err instanceof Error ? err.message : String(err)))
+              }
+            >
+              Buscar en el servidor
+            </button>
+            <button
+              className="btn ghost small"
+              style={{ alignSelf: "end" }}
+              title="Publica tus paquetes y flatpaks actuales como pack"
+              onClick={() =>
+                api
+                  .publish({
+                    name: cfg.name,
+                    desc: baseById(cfg.base).label + " - " + cfg.packages.length + " paquetes",
+                    json: { name: cfg.name, packages: cfg.packages, flatpakApps: cfg.flatpakApps },
+                  })
+                  .then(() => api.search("").then((r) => setServerPacks(r.packs)))
+                  .catch((err) => alert(err instanceof Error ? err.message : String(err)))
+              }
+            >
+              Publicar mi config como pack
+            </button>
+          </div>
+          {serverPacks && (
+            <div className="chips">
+              {serverPacks.map((sp) => (
+                <button
+                  key={sp.id}
+                  className="chip"
+                  title={sp.desc}
+                  onClick={() =>
+                    upd(
+                      applyPack(cfg, {
+                        id: String(sp.id),
+                        name: sp.name,
+                        desc: sp.desc,
+                        packages: sp.json.packages,
+                        flatpakApps: sp.json.flatpakApps,
+                      })
+                    )
+                  }
+                >
+                  + {sp.name} - estrella {sp.rating.avg} ({sp.rating.n})
+                </button>
+              ))}
+              {serverPacks.length === 0 && (
+                <span className="hint">Sin resultados en el servidor.</span>
+              )}
+            </div>
+          )}
+          <div className="fields" style={{ marginTop: 10 }}>
+            <button
+              className="btn ghost small"
+              style={{ alignSelf: "end" }}
+              onClick={async () => {
+                try {
+                  const avail = await api.driveAvailable();
+                  if (!avail.available) {
+                    alert("El servidor no tiene QEMU instalado.");
+                    return;
+                  }
+                  const path = prompt(
+                    "Ruta absoluta de la imagen en el SERVIDOR (la VM arranca alli):",
+                    "/tmp/mi-distro.qcow2"
+                  );
+                  if (!path) return;
+                  const sess = await api.driveStart(path);
+                  window.open(getServerUrl() + sess.vncUrl, "_blank");
+                } catch (e) {
+                  alert("Test Drive: " + (e instanceof Error ? e.message : e));
+                }
+              }}
+            >
+              Play: Test Drive VNC (arranca tu imagen en el servidor)
+            </button>
+          </div>
+        </>
+      )}
       <div className="fields" style={{ marginTop: 12 }}>
         <label className="field" style={{ gridColumn: "1 / -1" }}>
           Importar pack (URL JSON o pega el JSON y pulsa Enter)

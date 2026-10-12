@@ -40,6 +40,10 @@ Además del smoke test, cada proyecto ISO puede llevar `testdrive.yml`: Actions 
 
 Con «Smoke test de arranque» activo, cada proyecto ISO incluye `smoke.yml`: Actions arranca la ISO en QEMU headless y comprueba que llega al login (añade `console=ttyS0` a los parámetros del kernel para ver todo el arranque en el log). La salida OCI puede firmarse con cosign keyless (OIDC de GitHub).
 
+## Servidor opcional (backend)
+
+`server/` es un backend Node 24 (Fastify + `node:sqlite`, Dockerfile incluido) que añade lo que la app estática no puede: **cuentas de usuario**, **galería con búsqueda server-side (FTS5)** y **Test Drive VNC interactivo** — arranca tu imagen en QEMU y la manejas desde el navegador con noVNC (sesiones con TTL de 15 min). La app lo detecta en *Paquetes → Servidor DistroForge*; sin él, todo lo demás funciona igual. Ver `server/README.md` para desplegarlo.
+
 ## Documentación
 
 Manual técnico completo (arquitectura, guía de pasos, cobertura por motor, CI, modo advanced y núcleo Rust) en [docs/DistroForge-Documentacion.pdf](docs/DistroForge-Documentacion.pdf).

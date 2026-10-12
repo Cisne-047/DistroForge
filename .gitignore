@@ -5,3 +5,5 @@ out/
 *.qcow2
 dump-*/
 rust/target/
+server/node_modules/
+server/dist/
