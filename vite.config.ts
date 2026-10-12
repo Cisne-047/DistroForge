@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    // el backend tiene su propia batería en server/ (node 24); aquí solo la app
+    include: ["tests/**"],
+  },
   // rutas relativas: la app funciona igual en Pages (/DistroForge/) que en cualquier otra ruta
   base: "./",
 });
