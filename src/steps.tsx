@@ -29,6 +29,8 @@ function DesktopPreview({
   motd,
   wallpaper,
   label,
+  startIcon,
+  logo,
 }: {
   desktopId: string;
   hostname: string;
@@ -36,7 +38,14 @@ function DesktopPreview({
   motd?: string;
   wallpaper?: string;
   label: string;
+  startIcon?: string;
+  logo?: string;
 }) {
+  const startIconContent = logo ? (
+    <img src={logo} alt="icono inicio" style={{ width: 14, height: 14 }} />
+  ) : (
+    (startIcon ?? "◆").slice(0, 3)
+  );
   const kind = chromeOf(desktopId);
   const host = hostname || "mi-distro";
   const user = username || "user";
@@ -72,7 +81,7 @@ function DesktopPreview({
       )}
       {kind === "panel" && (
         <div className="dp-panel">
-          <span className="dp-start">◆</span>
+          <span className="dp-start">{startIconContent}</span>
           <span className="dp-task">🌐 {label}</span>
           <span className="dp-task dp-dim">terminal</span>
           <span className="dp-clock">🔊 🔔 {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -148,6 +157,8 @@ export function BaseStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           username={cfg.system.username}
           wallpaper={cfg.wallpaper || undefined}
           label={`${b.label} · ${desk} · ${cfg.arch}`}
+          startIcon={cfg.startIcon}
+          logo={cfg.logo || undefined}
         />
         <span className="hint">
           Así arrancará una instalación limpia con esta base y este escritorio
@@ -700,6 +711,28 @@ export function BrandingStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
               />
               Auto-login del usuario principal (SDDM/GDM/LightDM)
             </label>
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
+              Icono del botón inicio (taskbar de la vista previa; si subes un logo, tiene prioridad)
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {["◆", "▲", "❖", "🐧", "🦅", "🔥", "⚡", "🍎"].map((ic) => (
+                  <button
+                    key={ic}
+                    className={"chip" + (cfg.startIcon === ic ? " sel" : "")}
+                    style={{ fontSize: 15 }}
+                    onClick={() => upd({ startIcon: ic })}
+                  >
+                    {ic}
+                  </button>
+                ))}
+                <input
+                  value={cfg.startIcon}
+                  maxLength={3}
+                  style={{ width: 64, textAlign: "center" }}
+                  onChange={(e) => upd({ startIcon: e.target.value })}
+                  aria-label="Icono personalizado"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div className="preview">
@@ -719,6 +752,8 @@ export function BrandingStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             motd={cfg.motd}
             wallpaper={cfg.wallpaper || undefined}
             label={b.label}
+            startIcon={cfg.startIcon}
+            logo={cfg.logo || undefined}
           />
         </div>
       </div>

@@ -485,6 +485,7 @@ export function defaultConfig(base: BaseId): DistroConfig {  const b = baseById(
     firewallPorts: [],
     bootTarget: "auto",
     logo: "",
+    startIcon: "◆",
     eulaText: "",
     unattended: false,
     smokeTest: false,

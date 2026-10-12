@@ -121,6 +121,8 @@ export interface DistroConfig {
   bootTarget: "auto" | "graphical" | "text";
   /** logo personalizado como data URL (png/jpeg/webp) — se copia a /usr/share/distroforge */
   logo: string;
+  /** icono del botón inicio de la taskbar (emoji/texto corto); el logo tiene prioridad */
+  startIcon: string;
   /** texto de EULA mostrado en el primer login interactivo */
   eulaText: string;
   /** Debian family: ISO de instalación desatendida con preseed */
