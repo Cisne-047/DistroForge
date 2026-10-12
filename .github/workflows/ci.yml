@@ -74,8 +74,9 @@ jobs:
       - name: wasm-opt (binaryen)
         run: |
           curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz
+          WASMOPT=$(find . -name wasm-opt -type f | head -n1)
           WASM=$(ls dist/*.wasm | head -n1)
-          ./binaryen-version_123/wasm-opt -O3 --enable-bulk-memory "$WASM" -o "$WASM.opt"
+          "$WASMOPT" -O3 --enable-bulk-memory "$WASM" -o "$WASM.opt"
           mv "$WASM.opt" "$WASM"
           ls -la dist/
 
