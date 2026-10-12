@@ -29,6 +29,23 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
     let pack_applied: RwSignal<Option<String>> = RwSignal::new(None);
     let gallery: RwSignal<Vec<GalleryEntry>> = RwSignal::new(Vec::new());
     let gallery_query = RwSignal::new(String::new());
+    let srv_url: RwSignal<String> = RwSignal::new(crate::server::server_url());
+    let srv_me: RwSignal<Option<String>> = RwSignal::new(None);
+    let srv_cred: RwSignal<(String, String)> = RwSignal::new((String::new(), String::new()));
+    let srv_packs: RwSignal<Option<Vec<crate::server::ServerPack>>> = RwSignal::new(None);
+    let srv_query: RwSignal<String> = RwSignal::new(String::new());
+
+    let refresh_me = move || {
+        spawn_local(async move {
+            match crate::server::me().await {
+                Ok(u) => srv_me.set(u),
+                Err(_) => srv_me.set(None),
+            }
+        });
+    };
+    if !crate::server::server_url().is_empty() {
+        refresh_me();
+    }
 
     let toggle = move |p: String| {
         cfg.update(|c| {
@@ -346,6 +363,220 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
                         .collect_view()
                 }}
             </div>
+            <h3>"Servidor DistroForge (opcional)"</h3>
+            <p class="hint">
+                "Conecta un backend ("
+                <code>"rust/server-rs"</code>
+                ") para cuentas, búsqueda server-side y Test Drive VNC interactivo. Sin él, todo lo demás funciona igual."
+            </p>
+            <div class="fields">
+                <label class="field">
+                    "URL del servidor"
+                    <input
+                        prop:value=move || srv_url.get()
+                        placeholder="http://localhost:8080"
+                        on:input=move |ev: web_sys::Event| {
+                            srv_url.set(util::input_val(&ev));
+                        }
+                        on:keydown=move |ev: web_sys::KeyboardEvent| {
+                            if ev.key() == "Enter" {
+                                crate::server::set_server_url(&srv_url.get());
+                                refresh_me();
+                            }
+                        }
+                    />
+                </label>
+                {move || match srv_me.get() {
+                    Some(user) => view! {
+                        <span class="tag" style="align-self:end; padding:8px 12px">
+                            {format!("conectado como {user}")}
+                        </span>
+                        <button
+                            class="btn ghost small"
+                            style="align-self:end"
+                            on:click=move |_| {
+                                spawn_local(async move {
+                                    let _ = crate::server::logout().await;
+                                    crate::server::clear_token();
+                                    srv_me.set(None);
+                                    srv_packs.set(None);
+                                });
+                            }
+                        >
+                            "Salir"
+                        </button>
+                    }.into_any(),
+                    None => view! {
+                        <label class="field">
+                            "Usuario"
+                            <input
+                                prop:value=move || srv_cred.get().0
+                                on:input=move |ev: web_sys::Event| {
+                                    let (_, p) = srv_cred.get();
+                                    srv_cred.set((util::input_val(&ev), p));
+                                }
+                            />
+                        </label>
+                        <label class="field">
+                            "Contraseña"
+                            <input
+                                type="password"
+                                prop:value=move || srv_cred.get().1
+                                on:input=move |ev: web_sys::Event| {
+                                    let (u, _) = srv_cred.get();
+                                    srv_cred.set((u, util::input_val(&ev)));
+                                }
+                            />
+                        </label>
+                        <div style="display:flex; gap:8px; align-self:end">
+                            <button
+                                class="btn small"
+                                on:click=move |_| {
+                                    let (u, p) = srv_cred.get();
+                                    spawn_local(async move {
+                                        match crate::server::login(&u, &p).await {
+                                            Ok(_) => refresh_me(),
+                                            Err(e) => util::alert(&format!("Login: {e}")),
+                                        }
+                                    });
+                                }
+                            >
+                                "Entrar"
+                            </button>
+                            <button
+                                class="btn ghost small"
+                                on:click=move |_| {
+                                    let (u, p) = srv_cred.get();
+                                    spawn_local(async move {
+                                        match crate::server::register(&u, &p).await {
+                                            Ok(_) => refresh_me(),
+                                            Err(e) => util::alert(&format!("Registro: {e}")),
+                                        }
+                                    });
+                                }
+                            >
+                                "Crear cuenta"
+                            </button>
+                        </div>
+                    }.into_any(),
+                }}
+            </div>
+            {move || srv_me.get().map(|_| {
+                view! {
+                    <div class="fields" style="margin-top:10px">
+                        <label class="field">
+                            "Búsqueda server-side (FTS5)"
+                            <input
+                                prop:value=move || srv_query.get()
+                                placeholder="steam, nas, multimedia..."
+                                on:input=move |ev: web_sys::Event| {
+                                    srv_query.set(util::input_val(&ev));
+                                }
+                                on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                    if ev.key() == "Enter" {
+                                        let q = srv_query.get();
+                                        spawn_local(async move {
+                                            match crate::server::search(&q).await {
+                                                Ok(ps) => srv_packs.set(Some(ps)),
+                                                Err(e) => util::alert(&e),
+                                            }
+                                        });
+                                    }
+                                }
+                            />
+                        </label>
+                        <button
+                            class="btn ghost small"
+                            style="align-self:end"
+                            on:click=move |_| {
+                                let q = srv_query.get();
+                                spawn_local(async move {
+                                    match crate::server::search(&q).await {
+                                        Ok(ps) => srv_packs.set(Some(ps)),
+                                        Err(e) => util::alert(&e),
+                                    }
+                                });
+                            }
+                        >
+                            "Buscar en el servidor"
+                        </button>
+                        <button
+                            class="btn ghost small"
+                            style="align-self:end"
+                            title="Publica tus paquetes y flatpaks actuales como pack"
+                            on:click=move |_| {
+                                let c = cfg.get();
+                                let name = c.name.clone();
+                                let n = c.packages.len();
+                                let json = serde_json::json!({
+                                    "name": name,
+                                    "packages": c.packages,
+                                    "flatpakApps": c.flatpak_apps,
+                                });
+                                spawn_local(async move {
+                                    match crate::server::publish(&name, &format!("{n} paquetes"), json).await {
+                                        Ok(_) => match crate::server::search("").await {
+                                            Ok(ps) => srv_packs.set(Some(ps)),
+                                            Err(e) => util::alert(&e),
+                                        },
+                                        Err(e) => util::alert(&e),
+                                    }
+                                });
+                            }
+                        >
+                            "Publicar mi config como pack"
+                        </button>
+                        <button
+                            class="btn ghost small"
+                            style="align-self:end"
+                            on:click=move |_| {
+                                spawn_local(async move {
+                                    match crate::server::drive_available().await {
+                                        Ok(true) => {
+                                            if let Some(path) = util::prompt(
+                                                "Ruta absoluta de la imagen en el SERVIDOR:",
+                                                "/tmp/mi-distro.qcow2",
+                                            ) {
+                                                match crate::server::drive_start(&path).await {
+                                                    Ok(url) => { let _ = crate::util::open_tab(&url); }
+                                                    Err(e) => util::alert(&format!("Test Drive: {e}")),
+                                                }
+                                            }
+                                        }
+                                        Ok(false) => util::alert("El servidor no tiene QEMU instalado."),
+                                        Err(e) => util::alert(&e),
+                                    }
+                                });
+                            }
+                        >
+                            "▶ Test Drive VNC (arranca tu imagen en el servidor)"
+                        </button>
+                    </div>
+                    <div class="chips">
+                        {move || srv_packs.get().map(|ps| {
+                            ps.iter().map(|sp| {
+                                let pk = sp.clone();
+                                view! {
+                                    <button
+                                        class="chip"
+                                        title=pk.desc.clone()
+                                        on:click=move |_| {
+                                            let p = pk.clone();
+                                            let cur = cfg.get();
+                                            if let Some(pack) = crate::server::json_to_pack(&p.json) {
+                                                cfg.set(apply_pack(&cur, &pack));
+                                                flash(pack_applied, p.name.clone(), 3000);
+                                            }
+                                        }
+                                    >
+                                        {format!("+ {} · ★{} ({})", pk.name, pk.rating.avg, pk.rating.n)}
+                                    </button>
+                                }
+                            }).collect_view()
+                        }).unwrap_or_default()}
+                    </div>
+                }
+            })}
             <div class="fields" style="margin-top:12px">
                 <label class="field" style="grid-column: 1 / -1">
                     "Importar pack (URL JSON o pega el JSON y pulsa Enter)"

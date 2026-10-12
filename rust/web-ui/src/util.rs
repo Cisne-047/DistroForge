@@ -42,6 +42,12 @@ pub fn ls_get(key: &str) -> Option<String> {
     ls.get_item(key).ok()?
 }
 
+pub fn ls_remove(key: &str) {
+    if let Ok(Some(ls)) = window().local_storage() {
+        let _ = ls.remove_item(key);
+    }
+}
+
 pub fn ls_set(key: &str, value: &str) {
     if let Ok(Some(ls)) = window().local_storage() {
         let _ = ls.set_item(key, value);
@@ -163,4 +169,20 @@ pub async fn fetch_text(url: &str) -> Result<String, String> {
         return Err(format!("HTTP {status}"));
     }
     res.text().await.map_err(|e| e.to_string())
+}
+
+/// prompt() del navegador con valor por defecto; None si se cancela.
+pub fn prompt(msg: &str, default: &str) -> Option<String> {
+    window()
+        .prompt_with_message_and_default(msg, default)
+        .ok()
+        .flatten()
+}
+
+/// Abre una URL en pestaña nueva (Test Drive VNC).
+pub fn open_tab(url: &str) -> Result<(), String> {
+    window()
+        .open_with_url_and_target(url, "_blank")
+        .map_err(|_| "el navegador bloqueó la pestaña".to_string())
+        .map(|_| ())
 }

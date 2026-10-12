@@ -14,6 +14,7 @@
 
 mod app;
 mod packs;
+mod server;
 mod preview;
 mod state;
 mod steps;

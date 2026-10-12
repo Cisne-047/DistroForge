@@ -71,6 +71,13 @@ jobs:
         run: rustup target add wasm32-unknown-unknown && cargo check --target wasm32-unknown-unknown
       - name: Build release
         run: trunk build --release
+      - name: wasm-opt (binaryen)
+        run: |
+          curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz
+          WASM=$(ls dist/*.wasm | head -n1)
+          ./binaryen-version_123/wasm-opt -O3 --enable-bulk-memory "$WASM" -o "$WASM.opt"
+          mv "$WASM.opt" "$WASM"
+          ls -la dist/
 
   legacy:
     # app React/TS original + backend Node: referencia y suite de paridad

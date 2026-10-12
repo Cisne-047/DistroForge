@@ -1,0 +1,43 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  tauri:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Dependencias de Tauri (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Trunk
+        uses: jetli/trunk-action@v0.5.0
+      - name: UI de la app de escritorio
+        run: |
+          rustup target add wasm32-unknown-unknown
+          trunk build --release
+        working-directory: rust/web-ui
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust
+            rust/tauri-app/src-tauri
+      - name: Construir binario de escritorio
+        run: cargo tauri build || cargo install tauri-cli --version '^2' && cargo tauri build
+        working-directory: rust/tauri-app/src-tauri
+      - name: Subir artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: distroforge-desktop
+          path: |
+            rust/tauri-app/src-tauri/target/release/bundle/deb/*.deb
+            rust/tauri-app/src-tauri/target/release/bundle/appimage/*.AppImage
+            rust/tauri-app/src-tauri/target/release/bundle/rpm/*.rpm
+          if-no-files-found: warn

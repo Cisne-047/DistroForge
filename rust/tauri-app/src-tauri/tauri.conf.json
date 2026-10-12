@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.distroforge.desktop",
   "build": {
-    "frontendDist": "../../dist"
+    "frontendDist": "../../web-ui/dist"
   },
   "app": {
     "windows": [
