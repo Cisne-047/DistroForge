@@ -471,7 +471,8 @@ aside.summary {
 .desk-login {
   position: absolute;
   left: 18px;
-  bottom: 16px;
+  /* por encima de la taskbar/dock del mock (26-38px) para no taparlos */
+  bottom: 52px;
   right: 18px;
   font-family: ui-monospace, Consolas, monospace;
   font-size: 12.5px;
