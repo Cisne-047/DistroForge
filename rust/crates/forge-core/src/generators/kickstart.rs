@@ -2,7 +2,9 @@
 //! `src/generators/kickstart.ts`.
 
 use crate::catalog::{desktop_packages, effective_repos};
-use crate::generators::accounts::{autologin_files, autostart_files, service_shell_lines, target_shell_line};
+use crate::generators::accounts::{
+    autologin_files, autostart_files, eula_files, service_shell_lines, target_shell_line,
+};
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines};
 use crate::generators::livebuild::sanitize_alias;
@@ -70,6 +72,11 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         .map(|(path, content)| ExtraFile { path, content })
         .collect();
     post_lines.extend(extra_file_post_lines(&autostart_as_files));
+    let eula_as_files: Vec<ExtraFile> = eula_files(cfg)
+        .into_iter()
+        .map(|(path, content)| ExtraFile { path, content })
+        .collect();
+    post_lines.extend(extra_file_post_lines(&eula_as_files));
     post_lines.push(target_shell_line(cfg));
     for (path, content) in autologin_files(cfg) {
         post_lines.extend(extra_file_post_lines(&[ExtraFile { path, content }]));

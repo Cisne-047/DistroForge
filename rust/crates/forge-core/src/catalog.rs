@@ -816,6 +816,14 @@ pub fn default_config(base: BaseId) -> DistroConfig {
         autostart: vec![],
         firewall_ports: vec![],
         boot_target: crate::types::BootTarget::Auto,
+        logo: String::new(),
+        start_icon: "◆".to_string(),
+        eula_text: String::new(),
+        unattended: false,
+        smoke_test: false,
+        sign_image: false,
+        test_drive: false,
+        cloud_upload: crate::types::CloudUpload::None,
         cloud_init: false,
         motd: "Bienvenido a tu distro personalizada (DistroForge)".to_string(),
         wallpaper: String::new(),
@@ -868,6 +876,14 @@ pub fn merge_config(base: BaseId, parsed: PartialConfig) -> DistroConfig {
     if let Some(v) = p.autostart { d.autostart = v; }
     if let Some(v) = p.firewall_ports { d.firewall_ports = v; }
     if let Some(v) = p.boot_target { d.boot_target = v; }
+    if let Some(v) = p.logo { d.logo = v; }
+    if let Some(v) = p.start_icon { d.start_icon = v; }
+    if let Some(v) = p.eula_text { d.eula_text = v; }
+    if let Some(v) = p.unattended { d.unattended = v; }
+    if let Some(v) = p.smoke_test { d.smoke_test = v; }
+    if let Some(v) = p.sign_image { d.sign_image = v; }
+    if let Some(v) = p.test_drive { d.test_drive = v; }
+    if let Some(v) = p.cloud_upload { d.cloud_upload = v; }
     if let Some(v) = p.cloud_init { d.cloud_init = v; }
     if let Some(v) = p.motd { d.motd = v; }
     if let Some(v) = p.wallpaper { d.wallpaper = v; }
@@ -920,6 +936,14 @@ pub fn assign_partial(cfg: &mut DistroConfig, p: PartialConfig) {
     if let Some(v) = p.autostart { cfg.autostart = v; }
     if let Some(v) = p.firewall_ports { cfg.firewall_ports = v; }
     if let Some(v) = p.boot_target { cfg.boot_target = v; }
+    if let Some(v) = p.logo { cfg.logo = v; }
+    if let Some(v) = p.start_icon { cfg.start_icon = v; }
+    if let Some(v) = p.eula_text { cfg.eula_text = v; }
+    if let Some(v) = p.unattended { cfg.unattended = v; }
+    if let Some(v) = p.smoke_test { cfg.smoke_test = v; }
+    if let Some(v) = p.sign_image { cfg.sign_image = v; }
+    if let Some(v) = p.test_drive { cfg.test_drive = v; }
+    if let Some(v) = p.cloud_upload { cfg.cloud_upload = v; }
     if let Some(v) = p.cloud_init { cfg.cloud_init = v; }
     if let Some(v) = p.motd { cfg.motd = v; }
     if let Some(v) = p.wallpaper { cfg.wallpaper = v; }

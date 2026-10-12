@@ -19,10 +19,11 @@ pub mod wsl;
 use std::collections::BTreeMap;
 
 use crate::catalog::{archs_for_engine, base_by_id, effective_repos};
-use crate::generators::network::is_ipv4;
+use crate::generators::branding::logo_matches;
 use crate::generators::customiso::custom_iso_files;
 use crate::generators::dockerfile::{dockerfile_files, oci_supported};
-use crate::types::{ArchId, DistroConfig, EngineId, NetMode, OutputFormat};
+use crate::generators::network::is_ipv4;
+use crate::types::{ArchId, CloudUpload, DistroConfig, EngineId, NetMode, OutputFormat};
 
 /// Mapa ruta → contenido del proyecto generado.
 pub type FileMap = BTreeMap<String, String>;
@@ -40,12 +41,28 @@ pub fn generate_project(cfg: &DistroConfig) -> FileMap {
     let shared = || -> Vec<(String, String)> {
         let json =
             serde_json::to_string_pretty(cfg).unwrap_or_else(|_| "null".to_string());
-        vec![
+        let mut out = vec![
             (".github/workflows/build.yml".to_string(), workflow_yaml(cfg)),
             ("README.md".to_string(), readme_md(cfg)),
             // round-trip: el proyecto generado se reimporta en la app tal cual
             ("distroforge.json".to_string(), format!("{json}\n")),
-        ]
+        ];
+        if cfg.test_drive && cfg.output == OutputFormat::Iso && !cfg.advanced {
+            out.push((
+                ".github/workflows/testdrive.yml".to_string(),
+                test_drive_yaml(cfg),
+            ));
+        }
+        if cfg.cloud_upload != CloudUpload::None && !cfg.advanced {
+            out.push((
+                ".github/workflows/cloud-upload.yml".to_string(),
+                cloud_upload_yaml(cfg),
+            ));
+        }
+        if cfg.smoke_test && cfg.output == OutputFormat::Iso && !cfg.advanced {
+            out.push((".github/workflows/smoke.yml".to_string(), smoke_yaml(cfg)));
+        }
+        out
     };
     let mut engine_files = if cfg.output == OutputFormat::Oci
         && engine != EngineId::Manual
@@ -166,6 +183,18 @@ fn is_wallpaper_data_url(s: &str) -> bool {
         .any(|e| s.starts_with(&format!("data:image/{e};base64,")))
 }
 
+/// ¿Formato de salida que produce una imagen de disco? (qcow2/usb/vmdk/vdi/vhd)
+fn is_disk_output(o: OutputFormat) -> bool {
+    matches!(
+        o,
+        OutputFormat::Qcow2
+            | OutputFormat::Usb
+            | OutputFormat::Vmdk
+            | OutputFormat::Vdi
+            | OutputFormat::Vhd
+    )
+}
+
 /// Validaciones de la config. Devuelve la lista de mensajes (vacía = ok). Port
 /// de `validate`. Las ramas `!Array.isArray(...)` del TS son imposibles con
 /// tipos concretos y no se portan.
@@ -185,12 +214,29 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
     if cfg.system.password.is_empty() {
         out.push("Falta la contraseña del usuario.".to_string());
     }
-    if matches!(
-        cfg.output,
-        OutputFormat::Qcow2 | OutputFormat::Usb | OutputFormat::Vmdk | OutputFormat::Vdi
-    ) && engine != EngineId::Kiwi
-    {
-        out.push("QCOW2/USB/VMDK/VDI solo disponibles con motor KIWI (bases openSUSE).".to_string());
+    if is_disk_output(cfg.output) && engine != EngineId::Kiwi {
+        out.push("QCOW2/USB/VMDK/VDI/VHD solo disponibles con motor KIWI (bases openSUSE).".to_string());
+    }
+    if cfg.unattended && !matches!(engine, EngineId::Livebuild | EngineId::Kiwi) {
+        out.push(
+            "Desatendida: preseed (Debian) o AutoYaST/oem-unattended (openSUSE); el kickstart de Fedora ya es desatendido de serie."
+                .to_string(),
+        );
+    }
+    if !cfg.logo.is_empty() && !logo_matches(&cfg.logo) {
+        out.push("Logo: formato no soportado (usa png, jpeg o webp).".to_string());
+    }
+    if cfg.test_drive && cfg.output != OutputFormat::Iso {
+        out.push("Test Drive: las capturas del arranque solo aplican a la salida ISO.".to_string());
+    }
+    if cfg.cloud_upload != CloudUpload::None && !is_disk_output(cfg.output) {
+        out.push(
+            "Nube: la subida AWS/Azure necesita una imagen de disco (qcow2/usb/vmdk/vdi/vhd)."
+                .to_string(),
+        );
+    }
+    if cfg.smoke_test && (cfg.output != OutputFormat::Iso || cfg.advanced) {
+        out.push("Smoke test: solo aplica a la salida ISO (sin modo advanced).".to_string());
     }
     if cfg.output == OutputFormat::Oci && engine == EngineId::Manual {
         out.push("OCI no disponible en bases manuales (Gentoo/Solus).".to_string());
@@ -322,6 +368,12 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
         if !cfg.autostart.is_empty() {
             dropped.push("autostart");
         }
+        if !cfg.logo.is_empty() {
+            dropped.push("logo");
+        }
+        if !cfg.eula_text.is_empty() {
+            dropped.push("EULA");
+        }
         if !dropped.is_empty() {
             out.push(format!(
                 "Salida {}: se ignoran {} (no aplican a contenedor/WSL).",
@@ -354,6 +406,148 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
         }
     }
     out
+}
+
+/// Estimación grosera del tamaño de la imagen final, en MB. Solo orientativa:
+/// base mínima + escritorio + paquetes + flatpaks; el peso real depende de cada
+/// familia y del motor. Port de `estimateSizeMB`.
+pub fn estimate_size_mb(cfg: &DistroConfig) -> u32 {
+    let mut mb: f64 = 1100.0; // sistema base mínimo instalable
+    let desktop = base_by_id(cfg.base)
+        .desktops
+        .iter()
+        .find(|d| d.id == cfg.desktop);
+    if let Some(d) = desktop {
+        if d.id != "none" {
+            mb += 1400.0 + d.packages.len() as f64 * 60.0;
+        }
+    }
+    mb += cfg.packages.len() as f64 * 45.0;
+    mb += cfg.flatpak_apps.len() as f64 * 260.0;
+    if cfg.cloud_init {
+        mb += 40.0;
+    }
+    if !cfg.wallpaper.is_empty() || !cfg.logo.is_empty() {
+        mb += 6.0;
+    }
+    mb.round() as u32
+}
+
+/// Smoke test: arranca la ISO en QEMU headless dentro de CI y espera el login
+/// por consola serie. Port literal de `smokeYaml`.
+pub fn smoke_yaml(cfg: &DistroConfig) -> String {
+    format!(
+        r#"name: smoke
+on:
+  workflow_dispatch:
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: QEMU boot test
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86
+          ISO=$(find . -name '*.iso' | head -n1)
+          [ -n "$ISO" ] || {{ echo "No hay ISO que probar"; exit 1; }}
+          timeout 180 qemu-system-x86_64 -m 2048 -no-reboot -display none             -cdrom "$ISO" -serial file:serial.log || true
+          if grep -qE 'login:|Welcome to|Gracefully powering off' serial.log; then
+            echo "Smoke OK: la ISO arrancó"
+          else
+            echo "No se vio el login en el log serie (añade console=ttyS0 a los parámetros del kernel)"
+            tail -n 50 serial.log || true
+            exit 1
+          fi
+      - name: Log del arranque
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serial-log-{name}
+          path: serial.log
+          if-no-files-found: ignore
+"#,
+        name = cfg.name
+    )
+}
+
+/// Test Drive: arranca la ISO en QEMU y captura pantallas del arranque cada
+/// 12 s (consola VGA). Port literal de `testDriveYaml`.
+pub fn test_drive_yaml(cfg: &DistroConfig) -> String {
+    format!(
+        r#"name: testdrive
+on:
+  workflow_dispatch:
+jobs:
+  drive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Capturas del arranque
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86 netpbm socat
+          ISO=$(find . -name '*.iso' | head -n1)
+          [ -n "$ISO" ] || {{ echo "No hay ISO"; exit 1; }}
+          mkdir -p shots
+          qemu-system-x86_64 -m 2048 -no-reboot -display none -cdrom "$ISO" \
+            -monitor unix:qemu.mon,server,nowait &
+          QPID=$!
+          for i in 1 2 3 4 5 6 7 8; do
+            sleep 12
+            echo "screendump shots/shot-${{i}}.ppm" | socat - UNIX-CONNECT:qemu.mon || true
+          done
+          kill $QPID 2>/dev/null || true
+          for f in shots/*.ppm; do [ -f "$f" ] && pnmtopng "$f" > "${{f%.ppm}}.png" && rm "$f"; done || true
+          ls shots/*.png >/dev/null 2>&1 || {{ echo "Sin capturas"; exit 1; }}
+      - name: Subir capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: {name}-testdrive
+          path: shots/
+          if-no-files-found: error
+"#,
+        name = cfg.name
+    )
+}
+
+/// Subida a nube: AWS (S3 + import a AMI) o Azure (VHD en blob). Requiere
+/// secrets en el repo del proyecto; si faltan, avisa y termina bien. Port
+/// literal de `cloudUploadYaml`.
+pub fn cloud_upload_yaml(cfg: &DistroConfig) -> String {
+    let aws = cfg.cloud_upload == CloudUpload::Aws;
+    let env_block = if aws {
+        "          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}\n          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}\n          AWS_REGION: ${{ secrets.AWS_REGION }}\n          BUCKET: ${{ secrets.AWS_BUCKET }}".to_string()
+    } else {
+        "          AZ_STORAGE: ${{ secrets.AZ_STORAGE }}\n          AZ_KEY: ${{ secrets.AZ_KEY }}\n          AZ_CONTAINER: ${{ secrets.AZ_CONTAINER }}".to_string()
+    };
+    // El run block usa `${{ secrets.* }}` literal de GitHub Actions; se monta
+    // con replace para no pelearse con los escapes de llaves de format!.
+    let run_block = if aws {
+        r#"          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "Faltan secrets AWS_*; configura el repo"; exit 0; fi
+          aws s3 cp "$DISK" "s3://${{ secrets.AWS_BUCKET }}/@NAME@" || { pip install awscli && aws s3 cp "$DISK" "s3://${{ secrets.AWS_BUCKET }}/@NAME@"; }
+          echo "Despues registra la AMI con import-snapshot apuntando a s3://${{ secrets.AWS_BUCKET }}/@NAME@""#
+            .replace("@NAME@", &cfg.name)
+    } else {
+        r#"          if [ -z "${{ secrets.AZ_STORAGE }}" ]; then echo "Faltan secrets AZ_*; configura el repo"; exit 0; fi
+          pip install azure-cli >/dev/null 2>&1 || true
+          az storage blob upload --account-name "${{ secrets.AZ_STORAGE }}" --account-key "${{ secrets.AZ_KEY }}" -c "${{ secrets.AZ_CONTAINER }}" -f "$DISK" -n "@NAME@.vhd"
+          echo "Crea la imagen de Azure desde el blob @NAME@.vhd""#
+            .replace("@NAME@", &cfg.name)
+    };
+    format!(
+        "name: cloud-upload\non:\n  workflow_dispatch:\njobs:\n  {job}:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n      - name: Descargar artefacto del build\n        uses: dawidd6/action-download-artifact@v6\n        with:\n          workflow: build.yml\n          name: {name}-image\n          path: image\n      - name: {step}\n        env:\n{env_block}\n        run: |\n          DISK=$(find image -type f | head -n1)\n          [ -n \"$DISK\" ] || {{ echo \"No hay imagen de disco\"; exit 1; }}\n{run_block}\n",
+        job = if aws { "aws" } else { "azure" },
+        name = cfg.name,
+        step = if aws {
+            "Registrar AMI"
+        } else {
+            "Subir VHD a Azure"
+        },
+        env_block = env_block,
+        run_block = run_block
+    )
 }
 
 /// Workflow de GitHub Actions del proyecto (público porque el TS lo expone
@@ -394,11 +588,20 @@ pub fn workflow_yaml(cfg: &DistroConfig) -> String {
     }
 
     if cfg.output == OutputFormat::Oci {
+        let cosign = if cfg.sign_image {
+            format!(
+                "      - name: Firmar imagen (cosign keyless)\n        uses: sigstore/cosign-installer@v3\n      - name: Cosign sign\n        run: cosign sign --yes {name}:1.0.0\n",
+                name = cfg.name
+            )
+        } else {
+            String::new()
+        };
         return format!(
-            "{head}    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n{qemu}      - name: Construir imagen OCI\n        run: |\n          docker build -t {name}:1.0.0 .\n          docker save {name}:1.0.0 -o {name}.tar\n      - name: SBOM (syft)\n        uses: anchore/sbom-action@v0\n        with:\n          format: spdx-json\n          artifact: image\n          image: {name}:1.0.0\n      - name: Escaneo CVE (trivy)\n        uses: aquasecurity/trivy-action@0.28.0\n        with:\n          image-ref: {name}:1.0.0\n          severity: HIGH,CRITICAL\n          exit-code: \"0\"\n      - name: Subir artefacto\n        uses: actions/upload-artifact@v4\n        with:\n          name: {name}-oci\n          path: {name}.tar\n          if-no-files-found: error\n",
+            "{head}    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n{qemu}      - name: Construir imagen OCI\n        run: |\n          docker build -t {name}:1.0.0 .\n          docker save {name}:1.0.0 -o {name}.tar\n      - name: SBOM (syft)\n        uses: anchore/sbom-action@v0\n        with:\n          format: spdx-json\n          artifact: image\n          image: {name}:1.0.0\n      - name: Escaneo CVE (trivy)\n        uses: aquasecurity/trivy-action@0.28.0\n        with:\n          image-ref: {name}:1.0.0\n          severity: HIGH,CRITICAL\n          exit-code: \"0\"\n{cosign}      - name: Subir artefacto\n        uses: actions/upload-artifact@v4\n        with:\n          name: {name}-oci\n          path: {name}.tar\n          if-no-files-found: error\n",
             head = head,
             qemu = qemu_step,
-            name = cfg.name
+            name = cfg.name,
+            cosign = cosign
         );
     }
 
@@ -517,6 +720,30 @@ pub fn readme_md(cfg: &DistroConfig) -> String {
     } else {
         "DHCP".to_string()
     };
+    let logo_desc = format!(
+        "- Logo: {logo} · EULA: {eula}{unattended}{smoke}{sign}",
+        logo = if cfg.logo.is_empty() {
+            "no"
+        } else {
+            "sí (copiado a /usr/share/distroforge + greeter LightDM)"
+        },
+        eula = if cfg.eula_text.is_empty() { "no" } else { "sí (primer login)" },
+        unattended = if cfg.unattended {
+            " · instalación desatendida (preseed)"
+        } else {
+            ""
+        },
+        smoke = if cfg.smoke_test {
+            " · smoke test de arranque en CI (smoke.yml)"
+        } else {
+            ""
+        },
+        sign = if cfg.sign_image {
+            " · imagen firmada con cosign"
+        } else {
+            ""
+        },
+    );
     let repo_urls = if !repos.is_empty() {
         repos.iter().map(|r| r.url.as_str()).collect::<Vec<_>>().join(", ")
     } else {
@@ -548,7 +775,7 @@ pub fn readme_md(cfg: &DistroConfig) -> String {
     };
 
     format!(
-        "# {name}\n\nDistro personalizada generada con DistroForge.\n\n- Base: {label} (motor: {engine})\n- Escritorio: {desk}\n- Paquetes extra: {pkgs}\n- Flatpak: {apps}\n- Ficheros extra: {nfiles}\n- Usuarios extra: {nusers} · Servicios systemd: {nsvc}{autologin}\n- Arquitectura: {arch} · GRUB: timeout {timeout}s{kernel} · Firewall: {fw}\n- Red: {net}\n\n> Este proyecto incluye `distroforge.json`: puedes reimportarlo en DistroForge (Cargar config) o editarlo en git y volver a construir.\n- Repos custom: {repos}\n- Salida: {out}{ci}\n- Wallpaper: {wp}\n{oci}{wsl}{wpn}\n{manual}\n{arch_note}\n{flatpak_note}\n## Construir la imagen\n\n**Opción A — GitHub Actions (recomendado):** sube esta carpeta a un repo nuevo de GitHub. En *Actions → build → Run workflow*. El artefacto contendrá la imagen.\n\n**Opción B — local (Linux o WSL2 con Podman):**\n\n    bash build.sh\n\n## Estructura\n\n- `{dir}/` — receta de construcción del motor\n- `build.sh` — build local con Podman\n- `.github/workflows/build.yml` — build en CI\n\n## Seguridad\n\nLa contraseña del usuario va en texto plano dentro de la receta (`{dir}/`). No publiques el repo sin cambiarla o moverla a secretos de CI.\n",
+        "# {name}\n\nDistro personalizada generada con DistroForge.\n\n- Base: {label} (motor: {engine})\n- Escritorio: {desk}\n- Paquetes extra: {pkgs}\n- Flatpak: {apps}\n- Ficheros extra: {nfiles}\n- Usuarios extra: {nusers} · Servicios systemd: {nsvc}{autologin}\n- Arquitectura: {arch} · GRUB: timeout {timeout}s{kernel} · Firewall: {fw}\n- Red: {net}\n{logo}\n\n> Este proyecto incluye `distroforge.json`: puedes reimportarlo en DistroForge (Cargar config) o editarlo en git y volver a construir.\n- Repos custom: {repos}\n- Salida: {out}{ci}\n- Wallpaper: {wp}\n{oci}{wsl}{wpn}\n{manual}\n{arch_note}\n{flatpak_note}\n## Construir la imagen\n\n**Opción A — GitHub Actions (recomendado):** sube esta carpeta a un repo nuevo de GitHub. En *Actions → build → Run workflow*. El artefacto contendrá la imagen.\n\n**Opción B — local (Linux o WSL2 con Podman):**\n\n    bash build.sh\n\n## Estructura\n\n- `{dir}/` — receta de construcción del motor\n- `build.sh` — build local con Podman\n- `.github/workflows/build.yml` — build en CI\n\n## Seguridad\n\nLa contraseña del usuario va en texto plano dentro de la receta (`{dir}/`). No publiques el repo sin cambiarla o moverla a secretos de CI.\n",
         name = cfg.name,
         label = b.label,
         engine = b.engine,
@@ -564,6 +791,7 @@ pub fn readme_md(cfg: &DistroConfig) -> String {
         kernel = kernel_note,
         fw = if cfg.firewall { "habilitado (firewalld)" } else { "deshabilitado" },
         net = net_desc,
+        logo = logo_desc,
         repos = repo_urls,
         out = cfg.output.as_str().to_uppercase(),
         ci = ci_note,

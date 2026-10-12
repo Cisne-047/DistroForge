@@ -23,6 +23,7 @@ fn outputs_for(engine: EngineId) -> Vec<OutputFormat> {
             OutputFormat::Usb,
             OutputFormat::Vmdk,
             OutputFormat::Vdi,
+            OutputFormat::Vhd,
             OutputFormat::Oci,
             OutputFormat::Wsl,
         ],
@@ -1163,4 +1164,189 @@ fn base_by_id_cubre_todas_las_variantes() {
 fn workflow_yaml_directo_es_yaml_valido() {
     let yml = workflow_yaml(&cfg_for(BaseId::Debian));
     serde_yaml::from_str::<serde_yaml::Value>(&yml).unwrap();
+}
+
+// ---------------------------------------------------------------- bloque 16
+
+#[test]
+fn logo_binario_greeter_lightdm_y_aviso_de_formato() {
+    let mut c = cfg_for(BaseId::Debian);
+    c.logo = PNG_1PX.to_string();
+    let f = generate_project(&c);
+    assert_eq!(
+        f.get("livebuild/config/includes.chroot/usr/share/distroforge/logo.png")
+            .unwrap(),
+        PNG_1PX
+    );
+    assert!(f
+        .get("livebuild/config/includes.chroot/etc/lightdm/lightdm-gtk-greeter.conf.d/50-distroforge-logo.conf")
+        .unwrap()
+        .contains("logo=/usr/share/distroforge/logo.png"));
+    let mut bad = cfg_for(BaseId::Debian);
+    bad.logo = "data:image/gif;base64,R0lGOD".to_string();
+    assert!(validate(&bad).iter().any(|i| i.contains("Logo")));
+}
+
+#[test]
+fn eula_fichero_y_profile_d_una_vez() {
+    let mut c = cfg_for(BaseId::Debian);
+    c.eula_text = "Al usar esta distro aceptas que...".to_string();
+    let f = generate_project(&c);
+    assert!(f
+        .get("livebuild/config/includes.chroot/etc/distroforge/EULA")
+        .unwrap()
+        .contains("aceptas"));
+    let sh = f
+        .get("livebuild/config/includes.chroot/etc/profile.d/zz-distroforge-eula.sh")
+        .unwrap();
+    assert!(sh.contains("eula-shown"));
+    assert!(sh.contains("[ -t 0 ]"));
+}
+
+#[test]
+fn desatendida_preseed_y_bootappend_solo_debian() {
+    let mut c = cfg_for(BaseId::Debian);
+    c.unattended = true;
+    let f = generate_project(&c);
+    assert!(f.get("livebuild/auto/config").unwrap().contains("--debian-installer live"));
+    let pre = f
+        .get("livebuild/config/includes.installer/preseed.cfg")
+        .unwrap();
+    assert!(pre.contains("passwd/username string user"));
+    assert!(pre.contains("time/zone string Europe/Madrid"));
+    // sin unattended no hay preseed ni --debian-installer
+    let off = generate_project(&cfg_for(BaseId::Debian));
+    assert!(off.get("livebuild/config/includes.installer/preseed.cfg").is_none());
+    assert!(!off
+        .get("livebuild/auto/config")
+        .unwrap()
+        .contains("--debian-installer"));
+    // la línea --bootappend-install SIEMPRE está (vacía sin unattended)
+    assert!(off
+        .get("livebuild/auto/config")
+        .unwrap()
+        .contains("--bootappend-install \"\""));
+    let mut k = cfg_for(BaseId::Fedora);
+    k.unattended = true;
+    assert!(validate(&k).iter().any(|i| i.contains("preseed")));
+}
+
+#[test]
+fn vhd_solo_con_kiwi() {
+    let mut k = cfg_for(BaseId::OpensuseTumbleweed);
+    k.output = OutputFormat::Vhd;
+    assert!(generate_project(&k)
+        .get("kiwi/config.xml")
+        .unwrap()
+        .contains("format=\"vhd\""));
+    let mut d = cfg_for(BaseId::Debian);
+    d.output = OutputFormat::Vhd;
+    assert!(validate(&d).iter().any(|i| i.contains("VHD")));
+}
+
+#[test]
+fn smoke_yml_solo_en_iso_yaml_valido_y_cosign_en_oci() {
+    let mut c = cfg_for(BaseId::Debian);
+    c.smoke_test = true;
+    let files = generate_project(&c);
+    let smoke = files.get(".github/workflows/smoke.yml").unwrap();
+    assert!(smoke.contains("qemu-system-x86_64"));
+    serde_yaml::from_str::<serde_yaml::Value>(smoke).unwrap();
+    assert!(generate_project(&cfg_for(BaseId::Debian))
+        .get(".github/workflows/smoke.yml")
+        .is_none());
+    let mut o = cfg_for(BaseId::Debian);
+    o.output = OutputFormat::Oci;
+    o.sign_image = true;
+    let yml = generate_project(&o)
+        .get(".github/workflows/build.yml")
+        .unwrap()
+        .clone();
+    assert!(yml.contains("cosign sign --yes"));
+    serde_yaml::from_str::<serde_yaml::Value>(&yml).unwrap();
+}
+
+#[test]
+fn estimate_size_mb_crece_con_escritorio_paquetes_y_flatpaks() {
+    let base = forge_core::generators::estimate_size_mb(&cfg_for(BaseId::Debian));
+    let mut con_desk = cfg_for(BaseId::Debian);
+    con_desk.desktop = "gnome".to_string();
+    let mut con_paks = cfg_for(BaseId::Debian);
+    con_paks.packages = vec!["paquete".to_string(); 20];
+    let mut con_flat = cfg_for(BaseId::Debian);
+    con_flat.flatpak_apps = vec!["a.b.C".to_string(), "d.e.F".to_string()];
+    assert!(
+        forge_core::generators::estimate_size_mb(&con_desk) > base,
+        "escritorio debe pesar más"
+    );
+    assert!(
+        forge_core::generators::estimate_size_mb(&con_paks) > base,
+        "20 paquetes deben pesar más"
+    );
+    assert!(
+        forge_core::generators::estimate_size_mb(&con_flat) > base,
+        "flatpaks deben pesar más"
+    );
+}
+
+// ---------------------------------------------------------------- bloque 17
+
+#[test]
+fn autoyast_oem_unattended_autoinst_y_kickstart_avisa() {
+    let mut k = cfg_for(BaseId::OpensuseTumbleweed);
+    k.unattended = true;
+    k.output = OutputFormat::Usb;
+    let f = generate_project(&k);
+    assert!(f.get("kiwi/config.xml").unwrap().contains("oem-unattended=\"true\""));
+    let xml = f.get("kiwi/autoinst.xml").unwrap();
+    assert!(xml.contains("<username>user</username>"));
+    assert!(xml.contains("<timezone>Europe/Madrid</timezone>"));
+    assert!(validate(&k).is_empty(), "{:?}", validate(&k));
+    let mut fed = cfg_for(BaseId::Fedora);
+    fed.unattended = true;
+    assert!(validate(&fed).iter().any(|i| i.contains("desatendido")));
+}
+
+#[test]
+fn test_drive_capturas_solo_en_iso_yaml_valido() {
+    let mut c = cfg_for(BaseId::Debian);
+    c.test_drive = true;
+    let f = generate_project(&c);
+    let td = f.get(".github/workflows/testdrive.yml").unwrap();
+    assert!(td.contains("screendump"));
+    assert!(td.contains("pnmtopng"));
+    serde_yaml::from_str::<serde_yaml::Value>(td).unwrap();
+    c.output = OutputFormat::Oci;
+    assert!(generate_project(&c)
+        .get(".github/workflows/testdrive.yml")
+        .is_none());
+    assert!(validate(&c).iter().any(|i| i.contains("Test Drive")));
+}
+
+#[test]
+fn nube_workflows_aws_y_azure_con_disco_requerido() {
+    let mut aws = cfg_for(BaseId::OpensuseTumbleweed);
+    aws.output = OutputFormat::Qcow2;
+    aws.cloud_upload = forge_core::types::CloudUpload::Aws;
+    let yml = generate_project(&aws)
+        .get(".github/workflows/cloud-upload.yml")
+        .unwrap()
+        .clone();
+    assert!(yml.contains("secrets.AWS_ACCESS_KEY_ID"));
+    assert!(yml.contains("import-snapshot"));
+    serde_yaml::from_str::<serde_yaml::Value>(&yml).unwrap();
+
+    let mut az = cfg_for(BaseId::OpensuseTumbleweed);
+    az.output = OutputFormat::Vhd;
+    az.cloud_upload = forge_core::types::CloudUpload::Azure;
+    let yml2 = generate_project(&az)
+        .get(".github/workflows/cloud-upload.yml")
+        .unwrap()
+        .clone();
+    assert!(yml2.contains("az storage blob upload"));
+    serde_yaml::from_str::<serde_yaml::Value>(&yml2).unwrap();
+
+    let mut bad = cfg_for(BaseId::Debian);
+    bad.cloud_upload = forge_core::types::CloudUpload::Aws;
+    assert!(validate(&bad).iter().any(|i| i.contains("Nube")));
 }

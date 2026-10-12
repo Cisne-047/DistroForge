@@ -177,8 +177,29 @@ pub fn firewall_open_lines(cfg: &DistroConfig) -> Vec<String> {
         .collect()
 }
 
-/// Entradas .desktop de autostart para el usuario principal: ruta → contenido.
-/// Devuelve pares en el orden del TS (índice del programa).
+/// EULA en el primer login interactivo: fichero + profile.d que lo muestra una
+/// vez. Port de `eulaFiles`.
+pub fn eula_files(cfg: &DistroConfig) -> Vec<(String, String)> {
+    let text = cfg.eula_text.trim();
+    if text.is_empty() {
+        return vec![];
+    }
+    let heredoc = format!("cat > /etc/distroforge/EULA <<'DFEULA'\n{text}\nDFEULA");
+    vec![
+        (
+            "/etc/distroforge/EULA".to_string(),
+            format!("{text}\n"),
+        ),
+        (
+            "/etc/profile.d/zz-distroforge-eula.sh".to_string(),
+            format!(
+                "#!/bin/sh\n# DistroForge - muestra la EULA en el primer login interactivo\nif [ -t 0 ] && [ ! -f /var/lib/distroforge/eula-shown ]; then\n{heredoc}\n  mkdir -p /var/lib/distroforge\n  touch /var/lib/distroforge/eula-shown\nfi\n"
+            ),
+        ),
+    ]
+}
+
+/// Entradas .desktop de autostart para el usuario principal: ruta → contenido./// Devuelve pares en el orden del TS (índice del programa).
 pub fn autostart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     let u = &cfg.system.username;
     let mut out = Vec::new();

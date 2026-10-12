@@ -121,3 +121,34 @@ pub fn arch_dconf_boot_files() -> Vec<(String, String)> {
         ),
     ]
 }
+
+/// `LOGO_RE` del TS (`/^data:image\/(png|jpeg|webp);base64,/`): ¿el logo es una
+/// data URL png/jpeg/webp?
+pub fn logo_matches(s: &str) -> bool {
+    ["png", "jpeg", "webp"]
+        .iter()
+        .any(|e| s.starts_with(&format!("data:image/{e};base64,")))
+}
+
+/// Ficheros del logo Personalize: binario en /usr/share/distroforge y config
+/// del greeter LightDM cuando aplica. Vacío si no hay logo. Port de `logoFiles`.
+pub fn logo_files(cfg: &DistroConfig) -> Vec<(String, String)> {
+    if !logo_matches(&cfg.logo) {
+        return vec![];
+    }
+    let ext = if cfg.logo.starts_with("data:image/jpeg;") {
+        "jpg"
+    } else if cfg.logo.starts_with("data:image/webp;") {
+        "webp"
+    } else {
+        "png"
+    };
+    let dest = format!("/usr/share/distroforge/logo.{ext}");
+    vec![
+        (dest.clone(), cfg.logo.clone()),
+        (
+            "/etc/lightdm/lightdm-gtk-greeter.conf.d/50-distroforge-logo.conf".to_string(),
+            format!("[greeter]\nlogo={dest}\n"),
+        ),
+    ]
+}

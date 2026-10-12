@@ -3,12 +3,12 @@
 
 use crate::catalog::{base_by_id, deb_arch, desktop_packages, effective_repos};
 use crate::generators::accounts::{
-    autologin_files, autostart_files, extra_user_shell_lines, firewall_open_lines,
+    autologin_files, autostart_files, eula_files, extra_user_shell_lines, firewall_open_lines,
     firewall_service_line, service_shell_lines, target_shell_line, AdminGroup,
 };
 use crate::generators::branding::{
-    dconf_db_files, dconf_schema_for, wallpaper_applies, wallpaper_data_url, wallpaper_file_name,
-    wallpaper_packages, xfconf_wallpaper_xml, PkgFamily,
+    dconf_db_files, dconf_schema_for, logo_files, wallpaper_applies, wallpaper_data_url,
+    wallpaper_file_name, wallpaper_packages, xfconf_wallpaper_xml, PkgFamily,
 };
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines, has_flatpak_apps};
@@ -82,7 +82,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     );
 
     let auto_config = format!(
-        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --grub-timeout {timeout} \\\n    --bootappend-live \"{boot_append}\" \\\n    \"$@\"\n",
+        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --grub-timeout {timeout} \\\n    --bootappend-live \"{boot_append}\" \\\n    --bootappend-install \"{boot_install}\" \\\n{di_line}    \"$@\"\n",
         label = base.label,
         lb_arch = lb_arch,
         distro = distro,
@@ -91,7 +91,20 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         flavour = flavour,
         vol = slice28(&cfg.name),
         timeout = js_num(cfg.grub.timeout),
-        boot_append = boot_append
+        boot_append = boot_append,
+        // `--bootappend-install` SIEMPRE (vacío si no es desatendida); el
+        // `--debian-installer live` solo con unattended. El TS mete DOS
+        // backslashes en esa línea (`"\\\\\n"` en su código): se replica tal cual.
+        boot_install = if cfg.unattended {
+            "auto=true priority=critical"
+        } else {
+            ""
+        },
+        di_line = if cfg.unattended {
+            "    --debian-installer live \\\\\n"
+        } else {
+            ""
+        }
     );
 
     let auto_build = "#!/bin/sh\nset -e\nlb build noauto \"$@\" 2>&1 | tee build.log\n".to_string();
@@ -257,6 +270,12 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     for (p, c) in autostart_files(cfg) {
         files.push((format!("livebuild/config/includes.chroot{p}"), c));
     }
+    for (p, c) in logo_files(cfg) {
+        files.push((format!("livebuild/config/includes.chroot{p}"), c));
+    }
+    for (p, c) in eula_files(cfg) {
+        files.push((format!("livebuild/config/includes.chroot{p}"), c));
+    }
     files.push((
         "livebuild/config/hooks/0340-services.hooks.chroot".to_string(),
         services_hook,
@@ -266,6 +285,20 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         files.push((
             "livebuild/config/hooks/0350-flatpak.hooks.chroot".to_string(),
             flatpak_hook,
+        ));
+    }
+    if cfg.unattended {
+        files.push((
+            "livebuild/config/includes.installer/preseed.cfg".to_string(),
+            format!(
+                "d-i debian-installer/locale string {l}\nd-i keyboard-configuration/xkb-keymap select {k}\nd-i clock-setup/utc boolean true\nd-i time/zone string {tz}\nd-i passwd/user-fullname string {u}\nd-i passwd/username string {u}\nd-i passwd/user-password password {p}\nd-i passwd/user-password-again password {p}\nd-i netcfg/get_hostname string {h}\nd-i netcfg/get_domain string local\nd-i grub-installer/only_debian boolean true\nd-i finish-install/reboot_in_progress note\n",
+                l = sys.locale,
+                k = sys.keyboard,
+                tz = sys.timezone,
+                u = sys.username,
+                p = sys.password,
+                h = sys.hostname
+            ),
         ));
     }
     files.extend(wallpaper_files);

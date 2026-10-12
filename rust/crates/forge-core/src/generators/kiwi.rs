@@ -2,12 +2,12 @@
 
 use crate::catalog::{base_by_id, desktop_packages, effective_repos};
 use crate::generators::accounts::{
-    autologin_files, autostart_files, firewall_open_lines, firewall_service_line,
+    autologin_files, autostart_files, eula_files, firewall_open_lines, firewall_service_line,
     service_shell_lines, target_shell_line,
 };
 use crate::generators::branding::{
-    dconf_db_files, dconf_schema_for, wallpaper_applies, wallpaper_data_url, wallpaper_file_name,
-    wallpaper_packages, xfconf_wallpaper_xml, PkgFamily,
+    dconf_db_files, dconf_schema_for, logo_files, wallpaper_applies, wallpaper_data_url,
+    wallpaper_file_name, wallpaper_packages, xfconf_wallpaper_xml, PkgFamily,
 };
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines, has_flatpak_apps};
@@ -42,9 +42,14 @@ pub fn kiwi_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             format!("<type image=\"qcow2\" filesystem=\"btrfs\" primary=\"true\"{kern_attr}/>")
         }
         OutputFormat::Usb => {
-            format!("<type image=\"oem\" filesystem=\"btrfs\" primary=\"true\"{kern_attr}/>")
+            let unattended = if cfg.unattended {
+                " oem-unattended=\"true\""
+            } else {
+                ""
+            };
+            format!("<type image=\"oem\" filesystem=\"btrfs\" primary=\"true\"{kern_attr}{unattended}/>")
         }
-        OutputFormat::Vmdk | OutputFormat::Vdi => format!(
+        OutputFormat::Vmdk | OutputFormat::Vdi | OutputFormat::Vhd => format!(
             "<type image=\"vmx\" filesystem=\"btrfs\" format=\"{}\" primary=\"true\"{kern_attr}/>",
             cfg.output.as_str()
         ),
@@ -216,7 +221,26 @@ pub fn kiwi_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     for (p, c) in autostart_files(cfg) {
         files.push((format!("kiwi/root{p}"), c));
     }
+    for (p, c) in logo_files(cfg) {
+        files.push((format!("kiwi/root{p}"), c));
+    }
+    for (p, c) in eula_files(cfg) {
+        files.push((format!("kiwi/root{p}"), c));
+    }
     files.extend(net_file);
+    if cfg.unattended {
+        files.push((
+            "kiwi/autoinst.xml".to_string(),
+            format!(
+                "<?xml version=\"1.0\"?>\n<profile xmlns=\"http://www.suse.com/1.0/yast2ns\" xmlns:config=\"http://www.suse.com/1.0/configns\">\n  <general><mode><confirm config:type=\"boolean\">false</confirm></mode></general>\n  <language><language>{l}</language></language>\n  <keyboard><keymap>{k}</keymap></keyboard>\n  <timezone><hwclock>UTC</hwclock><timezone>{tz}</timezone></timezone>\n  <networking><keep_network config:type=\"boolean\">true</keep_network></networking>\n  <users config:type=\"list\">\n    <user><username>{u}</username><password>{p}</password><encrypt_password config:type=\"boolean\">false</encrypt_password><home>/home/{u}</home></user>\n  </users>\n</profile>\n",
+                l = sys.locale,
+                k = sys.keyboard,
+                tz = sys.timezone,
+                u = esc(&sys.username),
+                p = esc(&sys.password)
+            ),
+        ));
+    }
     files.extend(wallpaper_files);
     files.push(("build.sh".to_string(), build_sh));
     files

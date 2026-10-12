@@ -187,6 +187,8 @@ pub enum OutputFormat {
     Vmdk,
     /// VirtualBox VDI (solo KIWI).
     Vdi,
+    /// Hyper-V VHD (solo KIWI).
+    Vhd,
     /// Imagen de contenedor OCI (Dockerfile).
     Oci,
     /// rootfs para WSL (`wsl --import`).
@@ -202,6 +204,7 @@ impl OutputFormat {
             Self::Usb => "usb",
             Self::Vmdk => "vmdk",
             Self::Vdi => "vdi",
+            Self::Vhd => "vhd",
             Self::Oci => "oci",
             Self::Wsl => "wsl",
         }
@@ -215,6 +218,7 @@ impl OutputFormat {
             "usb" => Self::Usb,
             "vmdk" => Self::Vmdk,
             "vdi" => Self::Vdi,
+            "vhd" => Self::Vhd,
             "oci" => Self::Oci,
             "wsl" => Self::Wsl,
             _ => return None,
@@ -267,6 +271,36 @@ pub enum NetMode {
     Dhcp,
     /// IP estática.
     Static,
+}
+
+/// Destino de subida a la nube tras el build (`cloudUpload`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudUpload {
+    /// Sin subida.
+    #[default]
+    None,
+    /// AWS (S3 + import a AMI).
+    Aws,
+    /// Azure (VHD en blob).
+    Azure,
+}
+
+impl CloudUpload {
+    /// Valor exacto del enum en JSON/TS.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Aws => "aws",
+            Self::Azure => "azure",
+        }
+    }
+}
+
+impl fmt::Display for CloudUpload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Repo custom (`CustomRepo`).
@@ -387,7 +421,6 @@ impl Serialize for GrubConfig {
 /// Número JSON estilo JS: entero cuando `fract() == 0`, `null` para NaN/∞
 /// (misma salida que `JSON.stringify`).
 struct JsNumber(f64);
-
 impl Serialize for JsNumber {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let v = self.0;
@@ -410,6 +443,12 @@ pub fn js_num(v: f64) -> String {
     } else {
         format!("{}", v)
     }
+}
+
+/// Default de `startIcon` al deserializar configs que no lo traen (el
+/// `defaultConfig` del TS lo fija en "◆" y `mergeConfig` lo conservaría).
+fn default_start_icon() -> String {
+    "◆".to_string()
 }
 
 /// Modo advanced: remasterizado de una ISO base (`CustomIsoConfig`).
@@ -472,6 +511,23 @@ pub struct DistroConfig {
     pub firewall_ports: Vec<String>,
     /// Target de arranque: auto, gráfico o texto.
     pub boot_target: BootTarget,
+    /// Logo personalizado como data URL (png/jpeg/webp); se copia a /usr/share/distroforge.
+    pub logo: String,
+    /// Icono del botón inicio de la taskbar (emoji/texto corto); el logo tiene prioridad.
+    #[serde(default = "default_start_icon")]
+    pub start_icon: String,
+    /// Texto de EULA mostrado en el primer login interactivo.
+    pub eula_text: String,
+    /// Debian family: ISO de instalación desatendida con preseed.
+    pub unattended: bool,
+    /// Incluir workflow smoke.yml que arranca la ISO en QEMU dentro de CI.
+    pub smoke_test: bool,
+    /// Firmar la imagen OCI con cosign keyless (OIDC de GitHub).
+    pub sign_image: bool,
+    /// Test Drive en CI: capturas del arranque en QEMU (solo ISO).
+    pub test_drive: bool,
+    /// Subir la imagen de disco a la nube tras el build (requiere secrets en el repo).
+    pub cloud_upload: CloudUpload,
     /// Inyectar cloud-init (NoCloud) para VMs/cloud.
     pub cloud_init: bool,
     /// Mensaje del día (/etc/motd).
@@ -529,6 +585,22 @@ pub struct PartialConfig {
     pub firewall_ports: Option<Vec<String>>,
     /// Target de arranque.
     pub boot_target: Option<BootTarget>,
+    /// Logo (data URL).
+    pub logo: Option<String>,
+    /// Icono del botón inicio.
+    pub start_icon: Option<String>,
+    /// Texto de EULA.
+    pub eula_text: Option<String>,
+    /// Instalación desatendida.
+    pub unattended: Option<bool>,
+    /// Smoke test en CI.
+    pub smoke_test: Option<bool>,
+    /// Firmar imagen OCI con cosign.
+    pub sign_image: Option<bool>,
+    /// Test Drive en CI.
+    pub test_drive: Option<bool>,
+    /// Subida a la nube.
+    pub cloud_upload: Option<CloudUpload>,
     /// cloud-init.
     pub cloud_init: Option<bool>,
     /// MOTD.

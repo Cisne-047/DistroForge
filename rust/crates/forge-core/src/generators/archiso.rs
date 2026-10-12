@@ -3,11 +3,11 @@
 
 use crate::catalog::{base_by_id, desktop_packages, effective_repos};
 use crate::generators::accounts::{
-    autologin_files, autostart_files, firewall_exec_start, service_exec_start_lines,
+    autologin_files, autostart_files, eula_files, firewall_exec_start, service_exec_start_lines,
     target_shell_line, user_exec_start_lines, AdminGroup,
 };
 use crate::generators::branding::{
-    arch_dconf_boot_files, dconf_db_files, dconf_schema_for, wallpaper_applies,
+    arch_dconf_boot_files, dconf_db_files, dconf_schema_for, logo_files, wallpaper_applies,
     wallpaper_data_url, wallpaper_file_name, wallpaper_packages, xfconf_wallpaper_xml, PkgFamily,
 };
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
@@ -172,6 +172,12 @@ pub fn archiso_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         account_files.push((format!("archiso/airootfs{p}"), c));
     }
     for (p, c) in autostart_files(cfg) {
+        account_files.push((format!("archiso/airootfs{p}"), c));
+    }
+    for (p, c) in logo_files(cfg) {
+        account_files.push((format!("archiso/airootfs{p}"), c));
+    }
+    for (p, c) in eula_files(cfg) {
         account_files.push((format!("archiso/airootfs{p}"), c));
     }
 
