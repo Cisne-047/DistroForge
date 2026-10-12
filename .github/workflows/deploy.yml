@@ -21,21 +21,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Node 20
-        uses: actions/setup-node@v4
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Trunk
+        uses: jetli/trunk-action@v0.5.0
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
         with:
-          node-version: 20
-          cache: npm
-      - name: Dependencias
-        run: npm ci
-      - name: Build
-        run: npm run build
+          workspaces: rust/web-ui
+      - name: Build de la UI Rust
+        run: trunk build --release
+        working-directory: rust/web-ui
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Subir artefacto
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: rust/web-ui/dist
       - name: Desplegar
         id: deployment
         uses: actions/deploy-pages@v4

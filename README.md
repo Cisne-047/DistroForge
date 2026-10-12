@@ -1,76 +1,57 @@
-# DistroForge — monta tu propia distro
+# DistroForge — monta tu propia distro (100% Rust)
 
-Constructor web de distribuciones Linux personalizadas: eliges base, escritorio, paquetes, repos y sistema, y DistroForge genera el **proyecto de construcción completo** (receta del motor, `build.sh` local y workflow de GitHub Actions) listo para descargar como zip.
+Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paquetes, repos y sistema, y genera el **proyecto de construcción completo** (receta del motor, `build.sh` local y workflow de GitHub Actions) listo para descargar como zip. Sucesor espiritual de SUSE Studio.
 
-Todo corre en el navegador — no hay backend, no hay cuentas, la configuración vive en `localStorage`.
+**Todo el código es Rust** desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI de escritorio, el backend con Test Drive VNC (`axum`) y el scaffold Tauri. La app React/TS original y el backend Node viven en `legacy/` como referencia y suite de paridad.
+
+App en producción: **https://cisne-047.github.io/DistroForge/**
 
 ## Qué genera
 
-- **14 bases**: openSUSE (Tumbleweed/Leap), familia Debian (Debian, Ubuntu, Mint, elementary, Pop!_OS, Zorin), familia Arch (Arch, Manjaro, CachyOS), Fedora, Gentoo y Solus.
-- **4 motores de ISO** según familia: KIWI NG (openSUSE), live-build (Debian), mkarchiso (Arch) y kickstart + livemedia-creator (Fedora). Gentoo/Solus generan guía manual.
-- **7 salidas**: ISO (los 4 motores), QCOW2, USB/disco raw, VMDK y VDI (KIWI), **OCI/Docker** (Dockerfile + CI con `docker build`/`docker save`, sin `--privileged`) y **WSL** (rootfs tar importable con `wsl --import`).
-- **Extras**: hasta 10 escritorios, repos custom con suite/GPG (la key se importa de verdad en apt, zypper y dnf), cloud-init NoCloud opcional, MOTD editable, wallpaper aplicado vía dconf/xfconf, apps Flatpak, ficheros extra (dotfiles) por ruta absoluta, usuarios múltiples con admin, servicios systemd enable/disable, auto-login (SDDM/GDM/LightDM), logo personalizado (greeter LightDM), EULA en el primer login, instalación desatendida con preseed (Debian), target de arranque, autostart, firewall con puertos, modpacks estilo Prism + galería comunitaria (`gallery/`, ampliable por PR) — paridad con las pestañas General/Startup/Personalize/Files de SUSE Studio.
-- **Formatos de salida**: ISO, QCOW2, imagen USB/disco raw (KIWI `oem`), VMDK (VMware) y VDI (VirtualBox) en openSUSE; OCI y WSL en todas las bases no manuales.
-- **CI incluido en cada proyecto**: el zip trae `.github/workflows/build.yml` que construye la imagen en GitHub Actions y la sube como artefacto. Un lint propio (test `parsea el YAML de CI...`) valida todas las combinaciones base × salida.
+- **14 bases**: openSUSE (Tumbleweed/Leap), familia Debian (Debian, Ubuntu, Mint, elementary, Pop!_OS, Zorin), familia Arch (Arch, Manjaro, CachyOS), Fedora, Gentoo y Solus (guía manual).
+- **4 motores ISO**: KIWI NG, live-build, mkarchiso y kickstart + livemedia-creator.
+- **8 salidas**: ISO, QCOW2, USB/raw, VMDK, VDI, VHD, **OCI** (con SBOM syft + escaneo trivy + firma cosign opcional) y **WSL**.
+- **Arquitecturas**: x86_64, aarch64 (runners ARM nativos en CI), armhf (QEMU), i386.
+- **Features**: escritorios hasta 10, repos custom con GPG real, cloud-init, MOTD, wallpaper dconf/xfconf, logo, EULA, preseed/AutoYaST desatendida, usuarios múltiples, servicios, firewall con puertos, red estática, GRUB configurable, autostart, auto-login, flatpaks, ficheros overlay, modpacks estilo Prism + galería comunitaria (`gallery/`, por PR), plantillas rápidas, smoke test QEMU en CI, Test Drive con capturas, subida AWS/Azure, modo advanced (remaster de ISO custom con xorriso) y estimación de tamaño.
 
-## Uso
+## Estructura (Rust)
 
-**Online:** la app está desplegada en **https://cisne-047.github.io/DistroForge/** (deploy automático con cada push).
-
-**Local:**
-
-```bash
-npm install
-npm run dev        # http://127.0.0.1:5173
+```
+rust/
+  crates/forge-core   núcleo generador (79 tests, byte-parity con legacy)
+  crates/forge-cli    CLI: forge dump <base> <dir> [salida] [config.json]
+  crates/forge-wasm   bindings del core para la web
+  rust/web-ui         la app: Leptos 0.7 CSR + Trunk → dist/ para Pages
+  rust/server-rs      backend axum: cuentas, galería FTS5, Test Drive VNC (QEMU+noVNC)
+  rust/tauri-app      scaffold de app de escritorio (Tauri 2)
+legacy/               app React/TS + backend Node (referencia; 97+8 tests de paridad)
+gallery/              packs comunitarios (los consume la UI via raw.githubusercontent)
+docs/                 manual técnico (PDF)
+project/              ejemplo de proyecto generado
 ```
 
-Otros comandos: `npm test` (vitest), `npm run build` (tsc + vite build), `npx vite-node scripts/dump.ts <base> <nombre> <salida>` vuelca a disco la receta que generaría la app (útil para inspeccionar sin abrir el navegador).
+## Desarrollo
 
-## Flujo recomendado
+```bash
+# UI (dev con recarga)
+cd rust/web-ui && trunk serve
 
-1. Configura tu distro en los 5 pasos.
-2. **Descargar zip** y súbelo a un repo nuevo de GitHub → *Actions → build → Run workflow* → el artefacto es tu imagen. Sin Docker en local, esta es la vía para tener "tu distro" hoy.
-3. Alternativa local: `bash build.sh` dentro del zip (Linux o WSL2, requiere Podman/Docker).
+# core + CLI
+cd rust && cargo test -p forge-core && cargo run -p forge-cli -- dump debian /tmp/check iso
 
-## Test Drive y nube
+# backend (auth, galería FTS5, Test Drive VNC)
+cd rust/server-rs && cargo run --release   # :8080, QEMU opcional
 
-Además del smoke test, cada proyecto ISO puede llevar `testdrive.yml`: Actions arranca la ISO en QEMU y **captura pantallas del arranque cada 12 s** — el artefacto es un paseo visual por tu distro. Y las imágenes de disco pueden subirse a la nube con `cloud-upload.yml` (AWS: S3 + import-snapshot a AMI; Azure: blob VHD), workflows que se saltan con aviso si faltan los secrets correspondientes. La instalación desatendida cubre Debian (preseed) y openSUSE (`oem-unattended` + perfil AutoYaST `autoinst.xml`); el kickstart de Fedora ya es desatendido de serie.
-
-## QA extra
-
-Con «Smoke test de arranque» activo, cada proyecto ISO incluye `smoke.yml`: Actions arranca la ISO en QEMU headless y comprueba que llega al login (añade `console=ttyS0` a los parámetros del kernel para ver todo el arranque en el log). La salida OCI puede firmarse con cosign keyless (OIDC de GitHub).
-
-## Servidor opcional (backend)
-
-`server/` es un backend Node 24 (Fastify + `node:sqlite`, Dockerfile incluido) que añade lo que la app estática no puede: **cuentas de usuario**, **galería con búsqueda server-side (FTS5)** y **Test Drive VNC interactivo** — arranca tu imagen en QEMU y la manejas desde el navegador con noVNC (sesiones con TTL de 15 min). La app lo detecta en *Paquetes → Servidor DistroForge*; sin él, todo lo demás funciona igual. Ver `server/README.md` para desplegarlo.
-
-## Documentación
-
-Manual técnico completo (arquitectura, guía de pasos, cobertura por motor, CI, modo advanced y núcleo Rust) en [docs/DistroForge-Documentacion.pdf](docs/DistroForge-Documentacion.pdf).
-
-## Núcleo en Rust
-
-`rust/` contiene el port del generador a Rust: `forge-core` (librería documentada con tests propios), `forge-cli` (versión de escritorio: `forge dump <base> <dir> [salida] [config.json]`), `forge-wasm` (bindings web) y `tauri-app` (scaffold de app de escritorio). Compilar y probar: `cargo test -p forge-core && cargo build -p forge-cli`.
-
-## Roadmap
-
-- **Paridad SUSE Studio restante:** logo personalizado, EULA de primer arranque, ISO de instalación desatendida (preseed/AutoYaST), estimación de tamaño de imagen.
-- **Requiere backend:** Test Drive VNC real en el navegador y galería pública de distros.
-- **Post-paridad:** firmado de imágenes, resolución de dependencias de paquetes, salidas de nube (AMI/VHD).
+# legacy (referencia TS)
+cd legacy && npm ci && npm test
+```
 
 ## Seguridad
 
-La contraseña del usuario se incrusta en texto plano dentro de las recetas generadas (así funcionan los kickstart/presets de todos los motores). No publiques repos de proyectos generados con tu contraseña real — los tests de este repo solo usan `distroforge-test`.
+Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan kickstart/preseed) y en los enlaces para compartir. No publiques proyectos generados con tu contraseña real.
 
-## Estructura
+## Roadmap
 
-```
-src/
-  catalog.ts        bases, escritorios y paquetes por familia
-  steps.tsx         UI de los 5 pasos
-  generators/       un fichero por motor + index (zip, CI, README generado)
-  types.ts          DistroConfig
-tests/              suite de generadores (incluye lint de YAML de CI)
-scripts/dump.ts     vuelca recetas a disco
-project/            proyecto de distro generado, listo para subir a su propio repo
-```
+- Compilación del binario Tauri de escritorio en CI (release artifacts).
+- wasm-opt/binaryen para reducir el bundle de la UI (~2.4MB → ~700KB con brotli).
+- Sección "Servidor DistroForge" en la UI Rust (login/búsqueda/VNC; ya existe en legacy).

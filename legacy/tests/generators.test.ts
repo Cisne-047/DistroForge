@@ -954,8 +954,8 @@ describe("bloque 16: logo, EULA, desatendida, VHD, smoke, firma, galería, tama�
   it("galería: los packs del repo parsean con parsePack", async () => {
     const { parsePack } = await import("../src/packs");
     const { readFileSync, readdirSync } = await import("node:fs");
-    for (const f of readdirSync("gallery/packs")) {
-      const pk = parsePack(readFileSync(`gallery/packs/${f}`, "utf8"));
+    for (const f of readdirSync("../gallery/packs")) {
+      const pk = parsePack(readFileSync(`../gallery/packs/${f}`, "utf8"));
       expect(pk.name.length).toBeGreaterThan(0);
       expect(pk.packages.length).toBeGreaterThan(0);
     }

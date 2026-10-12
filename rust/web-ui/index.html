@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DistroForge — monta tu propia distro</title>
+    <link data-trunk rel="copy-file" href="public/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+    <script>
+      // Genera y descarga el ZIP del proyecto con fflate.
+      // Llamado desde Rust (util::download_zip) via wasm-bindgen interop.
+      window.distroforgeDownloadZip = function (name, filesJson) {
+        var files = JSON.parse(filesJson);
+        var data = fflate.zipSync(files, { level: 6 });
+        var blob = new Blob([data], { type: "application/zip" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name + "-distroforge.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      };
+    </script>
+  </head>
+  <body>
+    <noscript>Esta app necesita JavaScript (WASM) activado.</noscript>
+    <script type="module" src="src/main.rs"></script>
+  </body>
+</html>

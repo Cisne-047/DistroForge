@@ -1,0 +1,9 @@
+[build]
+    # Pages sirve bajo /DistroForge/; sin esto los assets absolutos rompen
+    public_url = "/DistroForge/"
+target = "index.html"
+dist = "dist"
+
+[serve]
+address = "127.0.0.1"
+port = 8080
