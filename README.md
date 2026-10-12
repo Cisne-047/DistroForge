@@ -32,6 +32,10 @@ Otros comandos: `npm test` (vitest), `npm run build` (tsc + vite build), `npx vi
 2. **Descargar zip** y súbelo a un repo nuevo de GitHub → *Actions → build → Run workflow* → el artefacto es tu imagen. Sin Docker en local, esta es la vía para tener "tu distro" hoy.
 3. Alternativa local: `bash build.sh` dentro del zip (Linux o WSL2, requiere Podman/Docker).
 
+## Test Drive y nube
+
+Además del smoke test, cada proyecto ISO puede llevar `testdrive.yml`: Actions arranca la ISO en QEMU y **captura pantallas del arranque cada 12 s** — el artefacto es un paseo visual por tu distro. Y las imágenes de disco pueden subirse a la nube con `cloud-upload.yml` (AWS: S3 + import-snapshot a AMI; Azure: blob VHD), workflows que se saltan con aviso si faltan los secrets correspondientes. La instalación desatendida cubre Debian (preseed) y openSUSE (`oem-unattended` + perfil AutoYaST `autoinst.xml`); el kickstart de Fedora ya es desatendido de serie.
+
 ## QA extra
 
 Con «Smoke test de arranque» activo, cada proyecto ISO incluye `smoke.yml`: Actions arranca la ISO en QEMU headless y comprueba que llega al login (añade `console=ttyS0` a los parámetros del kernel para ver todo el arranque en el log). La salida OCI puede firmarse con cosign keyless (OIDC de GitHub).

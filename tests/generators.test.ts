@@ -961,3 +961,52 @@ describe("bloque 16: logo, EULA, desatendida, VHD, smoke, firma, galería, tama�
     }
   });
 });
+
+describe("bloque 17: AutoYaST, Test Drive, nube y buscador de galería", () => {
+  it("AutoYaST: oem-unattended en usb y autoinst.xml con usuario; kickstart no avisa", () => {
+    const k = cfgFor("opensuse-tumbleweed");
+    k.unattended = true;
+    k.output = "usb";
+    const f = generateProject(k);
+    expect(f["kiwi/config.xml"]).toContain('oem-unattended="true"');
+    const xml = f["kiwi/autoinst.xml"];
+    expect(xml).toContain("<username>user</username>");
+    expect(xml).toContain("<timezone>Europe/Madrid</timezone>");
+    expect(validate(k)).toEqual([]);
+    const fed = cfgFor("fedora");
+    fed.unattended = true;
+    expect(validate(fed).some((i) => i.includes("desatendido"))).toBe(true);
+  });
+
+  it("Test Drive: capturas QEMU solo en ISO y YAML válido", () => {
+    const c = cfgFor("debian");
+    c.testDrive = true;
+    const f = generateProject(c);
+    const td = f[".github/workflows/testdrive.yml"];
+    expect(td).toContain("screendump");
+    expect(td).toContain("pnmtopng");
+    expect(() => yamlLoad(td)).not.toThrow();
+    c.output = "oci";
+    expect(generateProject(c)[".github/workflows/testdrive.yml"]).toBeUndefined();
+    expect(validate(c).some((i) => i.includes("Test Drive"))).toBe(true);
+  });
+
+  it("nube: workflows AWS y Azure con gate de secrets, YAML válido; disco requerido", () => {
+    const aws = cfgFor("opensuse-tumbleweed");
+    aws.output = "qcow2";
+    aws.cloudUpload = "aws";
+    const yml = generateProject(aws)[".github/workflows/cloud-upload.yml"];
+    expect(yml).toContain("secrets.AWS_ACCESS_KEY_ID");
+    expect(yml).toContain("import-snapshot");
+    expect(() => yamlLoad(yml)).not.toThrow();
+    const az = cfgFor("opensuse-tumbleweed");
+    az.output = "vhd";
+    az.cloudUpload = "azure";
+    const yml2 = generateProject(az)[".github/workflows/cloud-upload.yml"];
+    expect(yml2).toContain("az storage blob upload");
+    expect(() => yamlLoad(yml2)).not.toThrow();
+    const bad = cfgFor("debian");
+    bad.cloudUpload = "aws";
+    expect(validate(bad).some((i) => i.includes("Nube"))).toBe(true);
+  });
+});

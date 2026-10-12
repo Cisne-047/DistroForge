@@ -129,6 +129,10 @@ export interface DistroConfig {
   smokeTest: boolean;
   /** firmar la imagen OCI con cosign keyless (OIDC de GitHub) */
   signImage: boolean;
+  /** Test Drive en CI: capturas del arranque en QEMU (solo ISO) */
+  testDrive: boolean;
+  /** subir la imagen de disco a la nube tras el build (requiere secrets en el repo) */
+  cloudUpload: "none" | "aws" | "azure";
   /** inyectar cloud-init (NoCloud) para VMs/cloud */
   cloudInit: boolean;
   /** mensaje del día (/etc/motd) */

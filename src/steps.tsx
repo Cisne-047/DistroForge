@@ -441,6 +441,27 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         <label className="chk" style={{ gridColumn: "1 / -1" }}>
           <input
             type="checkbox"
+            checked={cfg.testDrive}
+            onChange={(e) => upd({ testDrive: e.target.checked })}
+          />
+          Test Drive en CI (testdrive.yml: capturas del arranque en QEMU, solo ISO)
+        </label>
+        <label className="field" style={{ maxWidth: 320 }}>
+          Subir a la nube tras el build (workflow aparte, requiere secrets en el repo)
+          <select
+            value={cfg.cloudUpload ?? "none"}
+            onChange={(e) =>
+              upd({ cloudUpload: e.target.value as "none" | "aws" | "azure" })
+            }
+          >
+            <option value="none">No subir</option>
+            <option value="aws">AWS (S3 + AMI)</option>
+            <option value="azure">Azure (VHD en blob)</option>
+          </select>
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
             checked={cfg.autologin}
             onChange={(e) => upd({ autologin: e.target.checked })}
           />
@@ -771,6 +792,7 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const [packDraft, setPackDraft] = useState("");
   const [packApplied, setPackApplied] = useState<string | null>(null);
   const [gallery, setGallery] = useState<{ file: string; name: string; desc: string }[]>([]);
+  const [galleryQuery, setGalleryQuery] = useState("");
   const b = baseById(cfg.base);
   const flatpak = cfg.flatpakApps ?? [];
   const sugg = b.suggestions.filter(
@@ -910,6 +932,14 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         Packs compartidos por la comunidad en la carpeta <code>gallery/</code> del repo — se
         cargan desde GitHub y se amplían con un PR.
       </p>
+      {gallery.length > 0 && (
+        <input
+          value={galleryQuery}
+          placeholder="filtrar packs de la galería..."
+          onChange={(e) => setGalleryQuery(e.target.value)}
+          style={{ marginBottom: 8 }}
+        />
+      )}
       <div className="chips">
         <button
           className="chip"
@@ -930,7 +960,11 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
         >
           ↻ Cargar galería
         </button>
-        {gallery.map((g) => (
+        {gallery
+          .filter((g) =>
+            (g.name + " " + g.desc).toLowerCase().includes(galleryQuery.toLowerCase())
+          )
+          .map((g) => (
           <button
             key={g.file}
             className="chip"

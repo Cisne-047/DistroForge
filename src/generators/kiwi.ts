@@ -40,7 +40,7 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
     cfg.output === "qcow2"
       ? `<type image="qcow2" filesystem="btrfs" primary="true"${kernAttr}/>`
       : cfg.output === "usb"
-        ? `<type image="oem" filesystem="btrfs" primary="true"${kernAttr}/>`
+        ? `<type image="oem" filesystem="btrfs" primary="true"${kernAttr}${cfg.unattended ? ' oem-unattended="true"' : ""}/>`
         : cfg.output === "vmdk" || cfg.output === "vdi" || cfg.output === "vhd"
           ? `<type image="vmx" filesystem="btrfs" format="${cfg.output}" primary="true"${kernAttr}/>`
           : `<type image="iso" primary="true" firmware="uefi"${kernAttr}/>`;
@@ -163,6 +163,24 @@ podman run --rm --privileged -v "$DIR":/project -v "$DIR/out":/out \\
 echo "Imagen lista en ./out"
 `;
 
+  // AutoYaST: instalación desatendida de openSUSE (perfil + nota en README generado)
+  const autoyast: Record<string, string> = cfg.unattended
+    ? {
+        "kiwi/autoinst.xml": `<?xml version="1.0"?>
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
+  <general><mode><confirm config:type="boolean">false</confirm></mode></general>
+  <language><language>${sys.locale}</language></language>
+  <keyboard><keymap>${sys.keyboard}</keymap></keyboard>
+  <timezone><hwclock>UTC</hwclock><timezone>${sys.timezone}</timezone></timezone>
+  <networking><keep_network config:type="boolean">true</keep_network></networking>
+  <users config:type="list">
+    <user><username>${esc(sys.username)}</username><password>${esc(sys.password)}</password><encrypt_password config:type="boolean">false</encrypt_password><home>/home/${esc(sys.username)}</home></user>
+  </users>
+</profile>
+`,
+      }
+    : {};
+
   return {
     "kiwi/config.xml": configXml,
     "kiwi/config.sh": configSh,
@@ -182,6 +200,7 @@ echo "Imagen lista en ./out"
       Object.entries(eulaFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
     ),
     ...netFile,
+    ...autoyast,
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

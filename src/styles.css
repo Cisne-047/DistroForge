@@ -642,3 +642,12 @@ header .btn.small { white-space: nowrap; }
 }
 
 .dp-motd { color: #8ef0dd; margin: 4px 0; white-space: pre-wrap; }
+
+.chips input {
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--txt);
+  padding: 4px 13px;
+  font-size: 13px;
+}

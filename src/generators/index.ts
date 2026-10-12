@@ -22,6 +22,12 @@ export function generateProject(cfg: DistroConfig): FileMap {
     "README.md": readmeMd(cfg),
     // round-trip: el proyecto generado se reimporta en la app tal cual
     "distroforge.json": JSON.stringify(cfg, null, 2) + "\n",
+    ...(cfg.testDrive && cfg.output === "iso" && !cfg.advanced
+      ? { ".github/workflows/testdrive.yml": testDriveYaml(cfg) }
+      : {}),
+    ...(cfg.cloudUpload !== "none" && !cfg.advanced
+      ? { ".github/workflows/cloud-upload.yml": cloudUploadYaml(cfg) }
+      : {}),
     ...(cfg.smokeTest && cfg.output === "iso" && !cfg.advanced
       ? { ".github/workflows/smoke.yml": smokeYaml(cfg) }
       : {}),
@@ -54,10 +60,14 @@ export function validate(cfg: DistroConfig): string[] {
   if (!cfg.system.password) out.push("Falta la contraseña del usuario.");
   if (["qcow2", "usb", "vmdk", "vdi", "vhd"].includes(cfg.output) && baseById(cfg.base).engine !== "kiwi")
     out.push("QCOW2/USB/VMDK/VDI/VHD solo disponibles con motor KIWI (bases openSUSE).");
-  if (cfg.unattended && baseById(cfg.base).engine !== "livebuild")
-    out.push("Desatendida: la instalación con preseed solo está disponible en la familia Debian (live-build).");
+  if (cfg.unattended && !["livebuild", "kiwi"].includes(baseById(cfg.base).engine))
+    out.push("Desatendida: preseed (Debian) o AutoYaST/oem-unattended (openSUSE); el kickstart de Fedora ya es desatendido de serie.");
   if (cfg.logo && !LOGO_RE.test(cfg.logo))
     out.push("Logo: formato no soportado (usa png, jpeg o webp).");
+  if (cfg.testDrive && cfg.output !== "iso")
+    out.push("Test Drive: las capturas del arranque solo aplican a la salida ISO.");
+  if (cfg.cloudUpload !== "none" && !["qcow2", "usb", "vmdk", "vdi", "vhd"].includes(cfg.output))
+    out.push("Nube: la subida AWS/Azure necesita una imagen de disco (qcow2/usb/vmdk/vdi/vhd).");
   if (cfg.smokeTest && (cfg.output !== "iso" || cfg.advanced))
     out.push("Smoke test: solo aplica a la salida ISO (sin modo advanced).");
   if (cfg.output === "oci" && baseById(cfg.base).engine === "manual")
@@ -233,6 +243,90 @@ jobs:
           name: serial-log-${cfg.name}
           path: serial.log
           if-no-files-found: ignore
+`;
+}
+
+/** Test Drive: arranca la ISO en QEMU y captura pantallas del arranque cada
+ *  12 s (consola VGA). El artefacto es un "paseo" visual por tu distro sin
+ *  descargar nada. */
+function testDriveYaml(cfg: DistroConfig): string {
+  return `name: testdrive
+on:
+  workflow_dispatch:
+jobs:
+  drive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Capturas del arranque
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86 netpbm socat
+          ISO=$(find . -name '*.iso' | head -n1)
+          [ -n "$ISO" ] || { echo "No hay ISO"; exit 1; }
+          mkdir -p shots
+          qemu-system-x86_64 -m 2048 -no-reboot -display none -cdrom "$ISO" \\
+            -monitor unix:qemu.mon,server,nowait &
+          QPID=$!
+          for i in 1 2 3 4 5 6 7 8; do
+            sleep 12
+            echo "screendump shots/shot-\${i}.ppm" | socat - UNIX-CONNECT:qemu.mon || true
+          done
+          kill $QPID 2>/dev/null || true
+          for f in shots/*.ppm; do [ -f "$f" ] && pnmtopng "$f" > "\${f%.ppm}.png" && rm "$f"; done || true
+          ls shots/*.png >/dev/null 2>&1 || { echo "Sin capturas"; exit 1; }
+      - name: Subir capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${cfg.name}-testdrive
+          path: shots/
+          if-no-files-found: error
+`;
+}
+
+/** Subida a nube: AWS (S3 + import a AMI) o Azure (VHD en blob). Requiere
+ *  secrets en el repo del proyecto; si faltan, avisa y termina bien. */
+function cloudUploadYaml(cfg: DistroConfig): string {
+  const aws = cfg.cloudUpload === "aws";
+  const envBlock = aws
+    ? `          AWS_ACCESS_KEY_ID: \${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: \${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: \${{ secrets.AWS_REGION }}
+          BUCKET: \${{ secrets.AWS_BUCKET }}`
+    : `          AZ_STORAGE: \${{ secrets.AZ_STORAGE }}
+          AZ_KEY: \${{ secrets.AZ_KEY }}
+          AZ_CONTAINER: \${{ secrets.AZ_CONTAINER }}`;
+  const runBlock = aws
+    ? `          if [ -z "\${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "Faltan secrets AWS_*; configura el repo"; exit 0; fi
+          aws s3 cp "$DISK" "s3://\${{ secrets.AWS_BUCKET }}/${cfg.name}" || { pip install awscli && aws s3 cp "$DISK" "s3://\${{ secrets.AWS_BUCKET }}/${cfg.name}"; }
+          echo "Despues registra la AMI con import-snapshot apuntando a s3://\${{ secrets.AWS_BUCKET }}/${cfg.name}"`
+    : `          if [ -z "\${{ secrets.AZ_STORAGE }}" ]; then echo "Faltan secrets AZ_*; configura el repo"; exit 0; fi
+          pip install azure-cli >/dev/null 2>&1 || true
+          az storage blob upload --account-name "\${{ secrets.AZ_STORAGE }}" --account-key "\${{ secrets.AZ_KEY }}" -c "\${{ secrets.AZ_CONTAINER }}" -f "$DISK" -n "${cfg.name}.vhd"
+          echo "Crea la imagen de Azure desde el blob ${cfg.name}.vhd"`;
+  return `name: cloud-upload
+on:
+  workflow_dispatch:
+jobs:
+  ${aws ? "aws" : "azure"}:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Descargar artefacto del build
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: build.yml
+          name: ${cfg.name}-image
+          path: image
+      - name: ${aws ? "Registrar AMI" : "Subir VHD a Azure"}
+        env:
+${envBlock}
+        run: |
+          DISK=$(find image -type f | head -n1)
+          [ -n "$DISK" ] || { echo "No hay imagen de disco"; exit 1; }
+${runBlock}
 `;
 }
 

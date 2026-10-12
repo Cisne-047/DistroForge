@@ -489,6 +489,8 @@ export function defaultConfig(base: BaseId): DistroConfig {  const b = baseById(
     unattended: false,
     smokeTest: false,
     signImage: false,
+    testDrive: false,
+    cloudUpload: "none",
     cloudInit: false,
     motd: "Bienvenido a tu distro personalizada (DistroForge)",
     wallpaper: "",
