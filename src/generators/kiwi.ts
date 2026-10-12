@@ -4,6 +4,7 @@ import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import {
   autologinFiles,
+  eulaFiles,
   autostartFiles,
   firewallOpenLines,
   firewallServiceLine,
@@ -20,6 +21,7 @@ import {
   wallpaperPackages,
   xfconfWallpaperXml,
 } from "./branding";
+import { logoFiles } from "./branding";
 
 function esc(s: string): string {
   return s
@@ -39,7 +41,7 @@ export function kiwiFiles(cfg: DistroConfig): Record<string, string> {
       ? `<type image="qcow2" filesystem="btrfs" primary="true"${kernAttr}/>`
       : cfg.output === "usb"
         ? `<type image="oem" filesystem="btrfs" primary="true"${kernAttr}/>`
-        : cfg.output === "vmdk" || cfg.output === "vdi"
+        : cfg.output === "vmdk" || cfg.output === "vdi" || cfg.output === "vhd"
           ? `<type image="vmx" filesystem="btrfs" format="${cfg.output}" primary="true"${kernAttr}/>`
           : `<type image="iso" primary="true" firmware="uefi"${kernAttr}/>`;
 
@@ -172,6 +174,12 @@ echo "Imagen lista en ./out"
     ),
     ...Object.fromEntries(
       Object.entries(autostartFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
+    ),
+    ...Object.fromEntries(
+      Object.entries(logoFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
+    ),
+    ...Object.fromEntries(
+      Object.entries(eulaFiles(cfg)).map(([p, c]) => [`kiwi/root${p}`, c])
     ),
     ...netFile,
     ...wallpaperFiles,

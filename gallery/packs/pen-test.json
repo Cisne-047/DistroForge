@@ -1,0 +1,6 @@
+{
+  "name": "Pentest ligero",
+  "desc": "nmap, wireshark, john y hashcat para auditorías básicas",
+  "packages": ["nmap", "wireshark", "john", "hashcat", "tcpdump"],
+  "flatpakApps": ["org.wireshark.Wireshark"]
+}

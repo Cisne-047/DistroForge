@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import type { DistroConfig } from "../types";
 import { baseById, effectiveRepos, archsForEngine } from "../catalog";
 import { IPV4_RE } from "./network";
+import { LOGO_RE } from "./branding";
 import { customIsoFiles } from "./customiso";
 import { kiwiFiles } from "./kiwi";
 import { livebuildFiles } from "./livebuild";
@@ -21,6 +22,9 @@ export function generateProject(cfg: DistroConfig): FileMap {
     "README.md": readmeMd(cfg),
     // round-trip: el proyecto generado se reimporta en la app tal cual
     "distroforge.json": JSON.stringify(cfg, null, 2) + "\n",
+    ...(cfg.smokeTest && cfg.output === "iso" && !cfg.advanced
+      ? { ".github/workflows/smoke.yml": smokeYaml(cfg) }
+      : {}),
   });
   if (cfg.output === "oci" && engine !== "manual" && ociSupported(cfg))
     return { ...dockerfileFiles(cfg), ...shared() };
@@ -48,8 +52,14 @@ export function validate(cfg: DistroConfig): string[] {
   if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(cfg.system.username))
     out.push("Usuario: minúsculas, debe empezar por letra o _.");
   if (!cfg.system.password) out.push("Falta la contraseña del usuario.");
-  if (["qcow2", "usb", "vmdk", "vdi"].includes(cfg.output) && baseById(cfg.base).engine !== "kiwi")
-    out.push("QCOW2/USB/VMDK/VDI solo disponibles con motor KIWI (bases openSUSE).");
+  if (["qcow2", "usb", "vmdk", "vdi", "vhd"].includes(cfg.output) && baseById(cfg.base).engine !== "kiwi")
+    out.push("QCOW2/USB/VMDK/VDI/VHD solo disponibles con motor KIWI (bases openSUSE).");
+  if (cfg.unattended && baseById(cfg.base).engine !== "livebuild")
+    out.push("Desatendida: la instalación con preseed solo está disponible en la familia Debian (live-build).");
+  if (cfg.logo && !LOGO_RE.test(cfg.logo))
+    out.push("Logo: formato no soportado (usa png, jpeg o webp).");
+  if (cfg.smokeTest && (cfg.output !== "iso" || cfg.advanced))
+    out.push("Smoke test: solo aplica a la salida ISO (sin modo advanced).");
   if (cfg.output === "oci" && baseById(cfg.base).engine === "manual")
     out.push("OCI no disponible en bases manuales (Gentoo/Solus).");
   if (cfg.output === "wsl" && baseById(cfg.base).engine === "manual")
@@ -130,6 +140,8 @@ export function validate(cfg: DistroConfig): string[] {
       cfg.network?.mode === "static" && "red estática",
       (cfg.services?.length ?? 0) > 0 && "servicios systemd",
       (cfg.autostart?.length ?? 0) > 0 && "autostart",
+      cfg.logo && "logo",
+      cfg.eulaText && "EULA",
     ].filter(Boolean);
     if (dropped.length)
       out.push(
@@ -154,6 +166,20 @@ export function validate(cfg: DistroConfig): string[] {
   return out;
 }
 
+/** Estimación grosera del tamaño de la imagen final, en MB. Solo orientativa:
+ *  base mínima + escritorio + paquetes + flatpaks; el peso real depende de cada
+ *  familia y del motor. Sirve para que nadie se descargue 4 GB pensando en 1. */
+export function estimateSizeMB(cfg: DistroConfig): number {
+  let mb = 1100; // sistema base mínimo instalable
+  const desktop = baseById(cfg.base).desktops.find((d) => d.id === cfg.desktop);
+  if (desktop && desktop.id !== "none") mb += 1400 + desktop.packages.length * 60;
+  mb += cfg.packages.length * 45;
+  mb += (cfg.flatpakApps?.length ?? 0) * 260;
+  if (cfg.cloudInit) mb += 40;
+  if (cfg.wallpaper || cfg.logo) mb += 6;
+  return Math.round(mb);
+}
+
 const B64_RE = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
 
 export async function downloadZip(cfg: DistroConfig): Promise<void> {
@@ -172,6 +198,42 @@ export async function downloadZip(cfg: DistroConfig): Promise<void> {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Smoke test: arranca la ISO en QEMU headless dentro de CI y espera el login
+ *  por consola serie. Para ver el arranque en el log añade `console=ttyS0` a los
+ *  parámetros del kernel en Branding. */
+function smokeYaml(cfg: DistroConfig): string {
+  return `name: smoke
+on:
+  workflow_dispatch:
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: QEMU boot test
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86
+          ISO=$(find . -name '*.iso' | head -n1)
+          [ -n "$ISO" ] || { echo "No hay ISO que probar"; exit 1; }
+          timeout 180 qemu-system-x86_64 -m 2048 -no-reboot -display none             -cdrom "$ISO" -serial file:serial.log || true
+          if grep -qE 'login:|Welcome to|Gracefully powering off' serial.log; then
+            echo "Smoke OK: la ISO arrancó"
+          else
+            echo "No se vio el login en el log serie (añade console=ttyS0 a los parámetros del kernel)"
+            tail -n 50 serial.log || true
+            exit 1
+          fi
+      - name: Log del arranque
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serial-log-${cfg.name}
+          path: serial.log
+          if-no-files-found: ignore
+`;
 }
 
 function workflowYaml(cfg: DistroConfig): string {
@@ -233,7 +295,11 @@ ${qemuStep}      - name: Construir imagen OCI
           image-ref: ${cfg.name}:1.0.0
           severity: HIGH,CRITICAL
           exit-code: "0"
-      - name: Subir artefacto
+${cfg.signImage ? `      - name: Firmar imagen (cosign keyless)
+        uses: sigstore/cosign-installer@v3
+      - name: Cosign sign
+        run: cosign sign --yes ${cfg.name}:1.0.0
+` : ""}      - name: Subir artefacto
         uses: actions/upload-artifact@v4
         with:
           name: ${cfg.name}-oci
@@ -357,6 +423,7 @@ Distro personalizada generada con DistroForge.
 - Usuarios extra: ${cfg.users?.length ?? 0} · Servicios systemd: ${cfg.services?.length ?? 0}${cfg.autologin ? " · auto-login" : ""}
 - Arquitectura: ${cfg.arch} · GRUB: timeout ${cfg.grub?.timeout ?? 10}s${cfg.grub?.extraParams ? ` · kernel: ${cfg.grub.extraParams}` : ""} · Firewall: ${cfg.firewall ? "habilitado (firewalld)" : "deshabilitado"}
 - Red: ${cfg.network?.mode === "static" ? `estática (${cfg.network.ip}/${cfg.network.prefix})` : "DHCP"}
+- Logo: ${cfg.logo ? "sí (copiado a /usr/share/distroforge + greeter LightDM)" : "no"} · EULA: ${cfg.eulaText ? "sí (primer login)" : "no"}${cfg.unattended ? " · instalación desatendida (preseed)" : ""}${cfg.smokeTest ? " · smoke test de arranque en CI (smoke.yml)" : ""}${cfg.signImage ? " · imagen firmada con cosign" : ""}
 
 > Este proyecto incluye \`distroforge.json\`: puedes reimportarlo en DistroForge (Cargar config) o editarlo en git y volver a construir.
 - Repos custom: ${repos.length ? repos.map((r) => r.url).join(", ") : "ninguno"}

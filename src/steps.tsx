@@ -3,6 +3,7 @@ import type { CustomRepo, DistroConfig, ExtraFile, ExtraUser, OutputFormat, Serv
 import { BASES, baseById, archsForEngine, mergeConfig, mergePresets, TIMEZONES, LOCALES, KEYBOARDS } from "./catalog";
 import { TEMPLATES, applyTemplate } from "./templates";
 import { PACKS, applyPack, parsePack, type Pack } from "./packs";
+import { estimateSizeMB } from "./generators";
 import { shareUrl } from "./share";
 import { generateProject, validate, downloadZip } from "./generators";
 
@@ -374,6 +375,69 @@ export function SystemStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
             }
           />
         </label>
+        <label className="field">
+          Logo (se copia a /usr/share/distroforge y lo usa el greeter LightDM)
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {cfg.logo ? (
+              <>
+                <img src={cfg.logo} alt="logo actual" className="wall-prev" />
+                <button className="btn ghost" onClick={() => upd({ logo: "" })}>
+                  Quitar
+                </button>
+              </>
+            ) : (
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  if (f.size > 1024 * 1024) {
+                    alert("Logo demasiado grande (máximo 1 MB).");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => upd({ logo: String(reader.result) });
+                  reader.readAsDataURL(f);
+                }}
+              />
+            )}
+          </div>
+        </label>
+        <label className="field" style={{ gridColumn: "1 / -1" }}>
+          EULA (texto legal mostrado una vez en el primer login interactivo)
+          <textarea
+            rows={3}
+            value={cfg.eulaText}
+            placeholder="Al usar esta distro aceptas que..."
+            onChange={(e) => upd({ eulaText: e.target.value })}
+          />
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.unattended}
+            onChange={(e) => upd({ unattended: e.target.checked })}
+          />
+          Instalación desatendida con preseed (solo familia Debian; la ISO instala sin preguntar)
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.smokeTest}
+            onChange={(e) => upd({ smokeTest: e.target.checked })}
+          />
+          Smoke test de arranque en CI (smoke.yml: QEMU headless sobre la ISO)
+        </label>
+        <label className="chk" style={{ gridColumn: "1 / -1" }}>
+          <input
+            type="checkbox"
+            checked={cfg.signImage}
+            onChange={(e) => upd({ signImage: e.target.checked })}
+          />
+          Firmar la imagen OCI con cosign keyless (OIDC de GitHub)
+        </label>
         <label className="chk" style={{ gridColumn: "1 / -1" }}>
           <input
             type="checkbox"
@@ -706,6 +770,7 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
   const [fdraft, setFdraft] = useState("");
   const [packDraft, setPackDraft] = useState("");
   const [packApplied, setPackApplied] = useState<string | null>(null);
+  const [gallery, setGallery] = useState<{ file: string; name: string; desc: string }[]>([]);
   const b = baseById(cfg.base);
   const flatpak = cfg.flatpakApps ?? [];
   const sugg = b.suggestions.filter(
@@ -840,6 +905,55 @@ export function PackagesStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           </button>
         ))}
       </div>
+      <h3>Galería comunitaria</h3>
+      <p className="hint">
+        Packs compartidos por la comunidad en la carpeta <code>gallery/</code> del repo — se
+        cargan desde GitHub y se amplían con un PR.
+      </p>
+      <div className="chips">
+        <button
+          className="chip"
+          onClick={async () => {
+            try {
+              const res = await fetch(
+                "https://raw.githubusercontent.com/Cisne-047/DistroForge/main/gallery/index.json",
+                { cache: "no-store" }
+              );
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const idx = (await res.json()) as { packs: { file: string; name: string; desc: string }[] };
+              setGallery(idx.packs ?? []);
+              if (!idx.packs?.length) alert("La galería está vacía todavía.");
+            } catch (e) {
+              alert(`No se pudo cargar la galería: ${e instanceof Error ? e.message : e}`);
+            }
+          }}
+        >
+          ↻ Cargar galería
+        </button>
+        {gallery.map((g) => (
+          <button
+            key={g.file}
+            className="chip"
+            title={g.desc}
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  `https://raw.githubusercontent.com/Cisne-047/DistroForge/main/gallery/${g.file}`,
+                  { cache: "no-store" }
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                upd(applyPack(cfg, parsePack(await res.text())));
+                setPackApplied(g.name);
+                setTimeout(() => setPackApplied(null), 3000);
+              } catch (e) {
+                alert(`Pack no válido: ${e instanceof Error ? e.message : e}`);
+              }
+            }}
+          >
+            + {g.name}
+          </button>
+        ))}
+      </div>
       <div className="fields" style={{ marginTop: 12 }}>
         <label className="field" style={{ gridColumn: "1 / -1" }}>
           Importar pack (URL JSON o pega el JSON y pulsa Enter)
@@ -878,6 +992,7 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           { v: "usb", l: "Imagen USB / disco raw" },
           { v: "vmdk", l: "Disco VMware (VMDK)" },
           { v: "vdi", l: "Disco VirtualBox (VDI)" },
+          { v: "vhd", l: "Disco Hyper-V (VHD)" },
           { v: "oci", l: "Imagen OCI (Docker/Podman)" },
           { v: "wsl", l: "Rootfs WSL (importar en Windows)" },
         ]
@@ -939,6 +1054,13 @@ export function OutputStep({ cfg, upd }: { cfg: DistroConfig; upd: Upd }) {
           {cfg.advanced
             ? "Modo advanced: salida ISO única (remaster de tu ISO base)."
             : "Motor manual: el zip incluye lista de paquetes y guía, sin build automático."}
+        </p>
+      )}
+      {!cfg.advanced && (
+        <p className="hint">
+          Tamaño estimado de la imagen: <strong>~{(estimateSizeMB(cfg) / 1024).toFixed(1)} GB</strong>{" "}
+          ({estimateSizeMB(cfg)} MB — muy orientativo; el peso real depende de la familia y del
+          motor).
         </p>
       )}
       {issues.length > 0 && (

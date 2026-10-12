@@ -1,0 +1,6 @@
+{
+  "packs": [
+    { "file": "packs/pen-test.json", "name": "Pentest ligero", "desc": "nmap, wireshark, john y hashcat para auditorías básicas" },
+    { "file": "packs/nas.json", "name": "NAS casero", "desc": "samba, nfs-kernel-server y smartmontools para tu servidor de ficheros" }
+  ]
+}

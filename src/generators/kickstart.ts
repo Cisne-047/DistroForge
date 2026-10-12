@@ -3,7 +3,7 @@ import { desktopPackages, effectiveRepos } from "../catalog";
 import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines } from "./flatpak";
 import { sanitizeAlias } from "./livebuild";
-import { autologinFiles, autostartFiles, serviceShellLines, targetShellLine } from "./accounts";
+import { autologinFiles, autostartFiles, eulaFiles, serviceShellLines, targetShellLine } from "./accounts";
 import { dottedMask, staticNetwork } from "./network";
 import { dirnameOf } from "./shell";
 
@@ -42,6 +42,9 @@ export function kickstartFiles(cfg: DistroConfig): Record<string, string> {
     ...extraFilePostLines(cfg.extraFiles),
     ...extraFilePostLines(
       Object.entries(autostartFiles(cfg)).map(([path, content]) => ({ path, content }))
+    ),
+    ...extraFilePostLines(
+      Object.entries(eulaFiles(cfg)).map(([path, content]) => ({ path, content }))
     ),
     targetShellLine(cfg),
     ...Object.entries(autologinFiles(cfg)).flatMap(([path, content]) =>

@@ -15,7 +15,7 @@ export type BaseId =
   | "fedora"
   | "gentoo"
   | "solus";
-export type OutputFormat = "iso" | "qcow2" | "usb" | "vmdk" | "vdi" | "oci" | "wsl";
+export type OutputFormat = "iso" | "qcow2" | "usb" | "vmdk" | "vdi" | "vhd" | "oci" | "wsl";
 
 export interface CustomRepo {
   alias: string;
@@ -119,6 +119,16 @@ export interface DistroConfig {
   firewallPorts: string[];
   /** target de arranque: auto (según escritorio), gráfico o texto */
   bootTarget: "auto" | "graphical" | "text";
+  /** logo personalizado como data URL (png/jpeg/webp) — se copia a /usr/share/distroforge */
+  logo: string;
+  /** texto de EULA mostrado en el primer login interactivo */
+  eulaText: string;
+  /** Debian family: ISO de instalación desatendida con preseed */
+  unattended: boolean;
+  /** incluir workflow smoke.yml que arranca la ISO en QEMU dentro de CI */
+  smokeTest: boolean;
+  /** firmar la imagen OCI con cosign keyless (OIDC de GitHub) */
+  signImage: boolean;
   /** inyectar cloud-init (NoCloud) para VMs/cloud */
   cloudInit: boolean;
   /** mensaje del día (/etc/motd) */

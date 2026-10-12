@@ -5,6 +5,7 @@ import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakApps, flatpakPackages, FLATHUB, hasFlatpakApps } from "./flatpak";
 import {
   autologinFiles,
+  eulaFiles,
   autostartFiles,
   firewallExecStart,
   serviceExecStartLines,
@@ -21,6 +22,7 @@ import {
   wallpaperPackages,
   xfconfWallpaperXml,
 } from "./branding";
+import { logoFiles } from "./branding";
 
 export function archisoFiles(cfg: DistroConfig): Record<string, string> {
   const base = baseById(cfg.base);
@@ -159,6 +161,10 @@ WantedBy=multi-user.target
   for (const [p, c] of Object.entries(autologinFiles(cfg)))
     accountFiles[`archiso/airootfs${p}`] = c;
   for (const [p, c] of Object.entries(autostartFiles(cfg)))
+    accountFiles[`archiso/airootfs${p}`] = c;
+  for (const [p, c] of Object.entries(logoFiles(cfg)))
+    accountFiles[`archiso/airootfs${p}`] = c;
+  for (const [p, c] of Object.entries(eulaFiles(cfg)))
     accountFiles[`archiso/airootfs${p}`] = c;
 
   if (wallpaperApplies(cfg)) {

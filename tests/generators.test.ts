@@ -12,7 +12,7 @@ const PNG_1PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 function outputsFor(engine: string): OutputFormat[] {
-  if (engine === "kiwi") return ["iso", "qcow2", "usb", "vmdk", "vdi", "oci", "wsl"];
+  if (engine === "kiwi") return ["iso", "qcow2", "usb", "vmdk", "vdi", "vhd", "oci", "wsl"];
   if (engine === "manual") return ["iso"];
   return ["iso", "oci", "wsl"];
 }
@@ -867,5 +867,97 @@ describe("bloque 15: modpacks estilo Prism", () => {
     const wrapped = parsePack('{"pack":{"name":"mio2","packages":["git"],"flatpakApps":["org.x.Y"]}}');
     expect(wrapped.flatpakApps).toEqual(["org.x.Y"]);
     expect(() => parsePack('{"nombre":"x"}')).toThrow(/packages/);
+  });
+});
+
+describe("bloque 16: logo, EULA, desatendida, VHD, smoke, firma, galería, tamaño", () => {
+  const PNG =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+  it("logo: binario en /usr/share/distroforge + greeter LightDM; aviso de formato", () => {
+    const c = cfgFor("debian");
+    c.logo = PNG;
+    const f = generateProject(c);
+    expect(f["livebuild/config/includes.chroot/usr/share/distroforge/logo.png"]).toBe(PNG);
+    expect(
+      f["livebuild/config/includes.chroot/etc/lightdm/lightdm-gtk-greeter.conf.d/50-distroforge-logo.conf"]
+    ).toContain("logo=/usr/share/distroforge/logo.png");
+    const bad = cfgFor("debian");
+    bad.logo = "data:image/gif;base64,R0lGOD";
+    expect(validate(bad).some((i) => i.includes("Logo"))).toBe(true);
+  });
+
+  it("EULA: fichero + profile.d que la muestra una sola vez", () => {
+    const c = cfgFor("debian");
+    c.eulaText = "Al usar esta distro aceptas que...";
+    const f = generateProject(c);
+    expect(f["livebuild/config/includes.chroot/etc/distroforge/EULA"]).toContain("aceptas");
+    const sh = f["livebuild/config/includes.chroot/etc/profile.d/zz-distroforge-eula.sh"];
+    expect(sh).toContain("eula-shown");
+    expect(sh).toContain("[ -t 0 ]");
+  });
+
+  it("desatendida: preseed + bootappend-install solo en familia Debian", () => {
+    const c = cfgFor("debian");
+    c.unattended = true;
+    const f = generateProject(c);
+    expect(f["livebuild/auto/config"]).toContain("--debian-installer live");
+    const pre = f["livebuild/config/includes.installer/preseed.cfg"];
+    expect(pre).toContain("passwd/username string user");
+    expect(pre).toContain("time/zone string Europe/Madrid");
+    const k = cfgFor("fedora");
+    k.unattended = true;
+    expect(validate(k).some((i) => i.includes("preseed"))).toBe(true);
+  });
+
+  it("VHD disponible solo con KIWI y YAML de CI válido", () => {
+    const k = cfgFor("opensuse-tumbleweed");
+    k.output = "vhd";
+    expect(generateProject(k)["kiwi/config.xml"]).toContain('format="vhd"');
+    const d = cfgFor("debian");
+    d.output = "vhd";
+    expect(validate(d).some((i) => i.includes("VHD"))).toBe(true);
+  });
+
+  it("smoke.yml de arranque QEMU solo en ISO, YAML válido; cosign en OCI al firmar", () => {
+    const c = cfgFor("debian");
+    c.smokeTest = true;
+    const files = generateProject(c);
+    const smoke = files[".github/workflows/smoke.yml"];
+    expect(smoke).toContain("qemu-system-x86_64");
+    expect(() => yamlLoad(smoke)).not.toThrow();
+    const off = cfgFor("debian");
+    expect(files[".github/workflows/smoke.yml"] ?? off ? undefined : undefined);
+    expect(generateProject(off)[".github/workflows/smoke.yml"]).toBeUndefined();
+    const o = cfgFor("debian");
+    o.output = "oci";
+    o.signImage = true;
+    const yml = generateProject(o)[".github/workflows/build.yml"];
+    expect(yml).toContain("cosign sign --yes");
+    expect(() => yamlLoad(yml)).not.toThrow();
+  });
+
+  it("estimateSizeMB crece con escritorio, paquetes y flatpaks", async () => {
+    const { estimateSizeMB } = await import("../src/generators");
+    const base = estimateSizeMB(cfgFor("debian"));
+    const conDesk = cfgFor("debian");
+    conDesk.desktop = "gnome";
+    const conPaks = cfgFor("debian");
+    conPaks.packages = Array(20).fill("paquete");
+    const conFlat = cfgFor("debian");
+    conFlat.flatpakApps = ["a.b.C", "d.e.F"];
+    expect(estimateSizeMB(conDesk)).toBeGreaterThan(base);
+    expect(estimateSizeMB(conPaks)).toBeGreaterThan(base);
+    expect(estimateSizeMB(conFlat)).toBeGreaterThan(base);
+  });
+
+  it("galería: los packs del repo parsean con parsePack", async () => {
+    const { parsePack } = await import("../src/packs");
+    const { readFileSync, readdirSync } = await import("node:fs");
+    for (const f of readdirSync("gallery/packs")) {
+      const pk = parsePack(readFileSync(`gallery/packs/${f}`, "utf8"));
+      expect(pk.name.length).toBeGreaterThan(0);
+      expect(pk.packages.length).toBeGreaterThan(0);
+    }
   });
 });

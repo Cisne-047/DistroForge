@@ -66,6 +66,22 @@ export function xfconfWallpaperXml(cfg: DistroConfig): string {
 `;
 }
 
+export const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,/;
+
+/** Ficheros del logo Personalize: binario en /usr/share/distroforge y config
+ *  del greeter LightDM cuando aplica. Devuelve {} si no hay logo. */
+export function logoFiles(cfg: DistroConfig): Record<string, string> {
+  if (!LOGO_RE.test(cfg.logo ?? "")) return {};
+  const ext = cfg.logo.startsWith("data:image/jpeg;") ? "jpg" : cfg.logo.startsWith("data:image/webp;") ? "webp" : "png";
+  const dest = `/usr/share/distroforge/logo.${ext}`;
+  const files: Record<string, string> = { [dest]: cfg.logo };
+  files["/etc/lightdm/lightdm-gtk-greeter.conf.d/50-distroforge-logo.conf"] =
+    `[greeter]
+logo=${dest}
+`;
+  return files;
+}
+
 /** Paquetes extra para aplicar el wallpaper según familia de gestor. */
 export function wallpaperPackages(
   cfg: DistroConfig,

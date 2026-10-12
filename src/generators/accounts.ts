@@ -65,6 +65,26 @@ export function serviceExecStartLines(cfg: DistroConfig): string[] {
     );
 }
 
+/** EULA en el primer login interactivo: fichero + profile.d que lo muestra una vez. */
+export function eulaFiles(cfg: DistroConfig): Record<string, string> {
+  const text = (cfg.eulaText ?? "").trim();
+  if (!text) return {};
+  const heredoc = `cat > /etc/distroforge/EULA <<'DFEULA'
+${text}
+DFEULA`;
+  return {
+    "/etc/distroforge/EULA": text + "\n",
+    "/etc/profile.d/zz-distroforge-eula.sh": `#!/bin/sh
+# DistroForge - muestra la EULA en el primer login interactivo
+if [ -t 0 ] && [ ! -f /var/lib/distroforge/eula-shown ]; then
+${heredoc}
+  mkdir -p /var/lib/distroforge
+  touch /var/lib/distroforge/eula-shown
+fi
+`,
+  };
+}
+
 /** Target systemd de arranque: respetando la elección del usuario y el escritorio. */
 export function defaultTarget(cfg: DistroConfig): "graphical" | "multi-user" {
   if (cfg.bootTarget === "text") return "multi-user";

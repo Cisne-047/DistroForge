@@ -4,6 +4,7 @@ import { CLOUD_INIT_PACKAGE, cloudInitYaml } from "./cloudinit";
 import { flatpakPackages, flatpakShellLines, hasFlatpakApps } from "./flatpak";
 import {
   autologinFiles,
+  eulaFiles,
   autostartFiles,
   extraUserShellLines,
   firewallOpenLines,
@@ -22,6 +23,7 @@ import {
   wallpaperPackages,
   xfconfWallpaperXml,
 } from "./branding";
+import { logoFiles } from "./branding";
 
 export function sanitizeAlias(a: string, i: number): string {
   const s = a.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^[._-]+/, "");
@@ -59,7 +61,8 @@ lb config noauto \\
     --iso-volume "${cfg.name.slice(0, 28)}" \\
     --grub-timeout ${cfg.grub?.timeout ?? 10} \\
     --bootappend-live "${bootAppend}" \\
-    "$@"
+    --bootappend-install "${cfg.unattended ? "auto=true priority=critical" : ""}" \\
+${cfg.unattended ? "    --debian-installer live \\\\\n" : ""}    "$@"
 `;
 
   const autoBuild = `#!/bin/sh
@@ -171,6 +174,24 @@ chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection || tru
       ] = xfconfWallpaperXml(cfg);
   }
 
+  const preseed: Record<string, string> = cfg.unattended
+    ? {
+        "livebuild/config/includes.installer/preseed.cfg": `d-i debian-installer/locale string ${sys.locale}
+d-i keyboard-configuration/xkb-keymap select ${sys.keyboard}
+d-i clock-setup/utc boolean true
+d-i time/zone string ${sys.timezone}
+d-i passwd/user-fullname string ${sys.username}
+d-i passwd/username string ${sys.username}
+d-i passwd/user-password password ${sys.password}
+d-i passwd/user-password-again password ${sys.password}
+d-i netcfg/get_hostname string ${sys.hostname}
+d-i netcfg/get_domain string local
+d-i grub-installer/only_debian boolean true
+d-i finish-install/reboot_in_progress note
+`,
+      }
+    : {};
+
   const files: Record<string, string> = {
     "livebuild/auto/config": autoConfig,
     "livebuild/auto/build": autoBuild,
@@ -199,11 +220,24 @@ chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection || tru
         c,
       ])
     ),
+    ...Object.fromEntries(
+      Object.entries(logoFiles(cfg)).map(([p, c]) => [
+        `livebuild/config/includes.chroot${p}`,
+        c,
+      ])
+    ),
+    ...Object.fromEntries(
+      Object.entries(eulaFiles(cfg)).map(([p, c]) => [
+        `livebuild/config/includes.chroot${p}`,
+        c,
+      ])
+    ),
     ...(servicesHook
       ? { "livebuild/config/hooks/0340-services.hooks.chroot": servicesHook }
       : {}),
     ...netFiles,
     ...(flatpakHook ? { "livebuild/config/hooks/0350-flatpak.hooks.chroot": flatpakHook } : {}),
+    ...preseed,
     ...wallpaperFiles,
     "build.sh": buildSh,
   };

@@ -1,0 +1,6 @@
+{
+  "name": "NAS casero",
+  "desc": "samba, nfs-kernel-server y smartmontools para tu servidor de ficheros",
+  "packages": ["samba", "nfs-kernel-server", "smartmontools", "mdadm"],
+  "desktop": "none"
+}
