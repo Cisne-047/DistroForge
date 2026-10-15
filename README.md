@@ -28,7 +28,7 @@ rust/
 legacy/               app React/TS + backend Node (referencia; suite de paridad)
 gallery/              packs comunitarios; la UI los empaqueta en el build
 tools/                scripts de mantenimiento (generación de iconos)
-docs/                 manual técnico y guía de despliegue
+docs/                 manual técnico (DOCX + PDF) y guía de despliegue
 project/              ejemplo de proyecto generado
 ```
 
@@ -96,5 +96,4 @@ Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan
 - **Rediseño visual de la UI**: sistema *Grafito & Verde*, variante oscura, claro y oscuro del mismo juego de tokens.
 - **Backend desplegado con URL por defecto**, para que cuentas y Test Drive funcionen en el sitio público.
 - Firma de los paquetes de escritorio y auto-actualización (`tauri-plugin-updater`).
-- Regenerar el manual en PDF para el stack Rust.
 - macOS (`.icns`) y firma de código si alguien lo necesita.
