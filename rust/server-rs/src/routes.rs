@@ -23,11 +23,12 @@ use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{any, delete, get, post};
 use axum::{Json, Router};
 use rusqlite::Connection;
 use serde_json::{Value, json};
 use tower_http::cors::{AllowHeaders, AllowOrigin, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::auth::{self, CurrentUser};
 use crate::db::{self, PackRow};
@@ -103,6 +104,41 @@ async fn health() -> Response {
         "version": env!("CARGO_PKG_VERSION"),
     }))
     .into_response()
+}
+
+/// Igual que `build_router_with_drives`, pero sirviendo además la interfaz web
+/// desde `web_dir`.
+///
+/// Servir la UI y la API en el **mismo origen** no es un capricho: la sesión
+/// viaja en una cookie `SameSite=Lax`, así que con la UI en otro dominio (por
+/// ejemplo GitHub Pages) el navegador no la envía y el login no se mantiene. Con
+/// la UI servida desde aquí, cuentas, galería con sesión y Test Drive funcionan
+/// sin configurar nada más.
+///
+/// Si `web_dir` es `None` o no existe, el router es exactamente el de antes (API
+/// pura): los tests y el uso como solo-backend no cambian.
+pub fn build_router_with_ui(
+    db: Connection,
+    drives: DriveManager,
+    web_dir: Option<std::path::PathBuf>,
+) -> Router {
+    let api = build_router_with_drives(db, drives)
+        // una ruta /api desconocida debe seguir siendo un 404 en JSON, no el
+        // index.html de la interfaz
+        .route("/api/{*resto}", any(api_desconocido));
+
+    match web_dir.filter(|dir| dir.is_dir()) {
+        Some(dir) => {
+            let index = dir.join("index.html");
+            api.fallback_service(ServeDir::new(&dir).not_found_service(ServeFile::new(index)))
+        }
+        None => api,
+    }
+}
+
+/// 404 en JSON para rutas de API que no existen.
+async fn api_desconocido() -> Response {
+    error(StatusCode::NOT_FOUND, "ruta no encontrada")
 }
 
 // ---------- helpers ----------

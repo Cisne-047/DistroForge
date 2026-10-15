@@ -6,4 +6,4 @@ pub mod routes;
 pub mod testdrive;
 pub mod vncbridge;
 
-pub use routes::{TTL, build_router, build_router_with_drives};
+pub use routes::{TTL, build_router, build_router_with_drives, build_router_with_ui};

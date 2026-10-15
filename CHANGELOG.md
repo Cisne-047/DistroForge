@@ -14,6 +14,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 ### Añadido
 
 - **App de escritorio publicable**: matriz de paquetes Linux (`.deb`, `.rpm`, `.AppImage`) y Windows (`.msi`, `.exe`), artefactos en cada ejecución y GitHub Release al empujar un tag. Iconos generados de forma reproducible con `tools/make_icons.py`.
+- **Servidor todo-en-uno**: con `DF_WEB_DIR`, `server-rs` sirve la interfaz junto a la API **en el mismo origen**, que es lo que hace que la cookie de sesión viaje: cuentas, galería compartida y Test Drive funcionan sin configurar ninguna URL. `tools/serve_tunnel.ps1` lo publica con un túnel de Cloudflare sin necesidad de cuentas.
 - **Backend listo para desplegar**: `GET /api/health` para el healthcheck, Dockerfile con la capa de dependencias cacheada, usuario sin privilegios, volumen para el SQLite y `HEALTHCHECK`; `docker-compose.yml`; workflow que publica la imagen en GHCR; y [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) con las opciones de hosting y el aviso sobre cookies entre dominios.
 - **Manual técnico reproducible** (`tools/make_manual.py` → DOCX + PDF): antes el PDF era anterior al rewrite y describía la app React.
 - **Enlace directo a un paso** (`?paso=N`) para compartir un punto concreto del asistente.
@@ -28,7 +29,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 
 ### Pendiente
 
-- Desplegar el backend: ya está automatizado (secreto `FLY_API_TOKEN` + tag) pero no desplegado, así que la UI no trae URL por defecto.
+- **Hosting permanente** del backend: hay despliegue verificado (túnel) y automatizado (Fly con `FLY_API_TOKEN`), pero dejar una URL fija y por defecto en la UI sigue necesitando una cuenta de hosting.
 - Firma de los paquetes de escritorio y auto-actualización.
 
 ## Versiones anteriores
