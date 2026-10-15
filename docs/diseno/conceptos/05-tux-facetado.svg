@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Concepto 5: Tux facetado">
+  <title>Concepto 5 · Tux facetado</title>
+  <rect width="120" height="120" rx="26" fill="#0F1211"/>
+  <path d="M60 12c11 0 19 9 20 22l3 22c2 17-4 31-12 39-4 4-18 4-22 0-8-8-14-22-12-39l3-22C42 21 49 12 60 12Z" fill="#2F7A55"/>
+  <path d="M60 12c11 0 19 9 20 22l-20 6-20-6C42 21 49 12 60 12Z" fill="#4FBF85"/>
+  <path d="M40 40l20 6v50c-9-1-15-6-19-13-5-9-6-25-1-43Z" fill="#4FBF85"/>
+  <ellipse cx="60" cy="76" rx="12" ry="17" fill="#1A201D"/>
+  <ellipse cx="53" cy="42" rx="4.2" ry="5.4" fill="#0F1211"/>
+  <ellipse cx="67" cy="42" rx="4.2" ry="5.4" fill="#0F1211"/>
+  <polygon points="56,49 64,49 60,58" fill="#E0A33C"/>
+  <path d="M46 96l-9 8h16Z" fill="#E0A33C"/>
+  <path d="M74 96l9 8H67Z" fill="#E0A33C"/>
+  <path d="M90 20l3.4 9.6L103 33l-9.6 3.4L90 46l-3.4-9.6L77 33l9.6-3.4Z" fill="#4FBF85"/>
+</svg>

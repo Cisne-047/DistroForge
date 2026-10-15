@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Concepto 3: Tux yunque">
+  <title>Concepto 3 · Tux yunque</title>
+  <rect width="120" height="120" rx="26" fill="#0F1211"/>
+  <circle cx="60" cy="31" r="16" fill="#E9EDEA"/>
+  <ellipse cx="53.5" cy="29" rx="3.4" ry="4.4" fill="#0F1211"/>
+  <ellipse cx="66.5" cy="29" rx="3.4" ry="4.4" fill="#0F1211"/>
+  <polygon points="56,37 64,37 60,46" fill="#E0A33C"/>
+  <path d="M20 63l13-5h45v10H33l-13-5Z" fill="#4FBF85"/>
+  <rect x="49" y="73" width="17" height="11" fill="#2F7A55"/>
+  <rect x="33" y="84" width="48" height="9" rx="3" fill="#4FBF85"/>
+  <path d="M88 22l3.2 9 9 3.2-9 3.2L88 46.6l-3.2-9.2-9-3.2 9-3.2Z" fill="#E0A33C"/>
+</svg>

@@ -29,7 +29,7 @@ rust/
 legacy/               app React/TS + backend Node (referencia; suite de paridad)
 gallery/              packs comunitarios; la UI los empaqueta en el build
 tools/                scripts de mantenimiento (generación de iconos)
-docs/                 manual técnico (DOCX + PDF) y guía de despliegue
+docs/                 manual técnico (DOCX + PDF), guía de despliegue y diseño
 project/              ejemplo de proyecto generado
 ```
 
