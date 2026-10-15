@@ -1,0 +1,12 @@
+.git
+.github
+**/node_modules
+**/target
+legacy
+out
+project
+docs
+gallery
+*.md
+.gitattributes
+.gitignore

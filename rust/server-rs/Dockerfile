@@ -1,10 +1,15 @@
-# Servidor DistroForge (Rust) con QEMU para el Test Drive.
+# Servidor DistroForge (Rust) con QEMU para el Test Drive y la interfaz web.
 #
-#   docker build -t distroforge-server rust/server-rs
+# El contexto es la RAÍZ del repositorio (la imagen incluye la UI):
+#
+#   cd rust/web-ui && trunk build --release --public-url /
+#   docker build -f rust/server-rs/Dockerfile -t distroforge-server .
 #   docker run --rm -p 8080:8080 -v df-data:/data distroforge-server
 #
-# El Test Drive arranca QEMU dentro del contenedor: sin /dev/kvm funciona, pero
-# muy lento. Ver docs/DESPLIEGUE.md.
+# Con la UI dentro, el contenedor sirve la aplicación y la API en el mismo
+# origen, que es lo que hace que la cookie de sesión viaje (ver
+# docs/DESPLIEGUE.md). El Test Drive arranca QEMU: sin /dev/kvm funciona, pero
+# muy lento.
 
 FROM rust:1-slim AS build
 WORKDIR /app
@@ -16,14 +21,14 @@ RUN apt-get update \
 
 # 1) Compila solo las dependencias con un src mínimo, para que la capa quede en
 #    caché y los cambios de código no recompilen todo el árbol.
-COPY Cargo.toml Cargo.lock ./
+COPY rust/server-rs/Cargo.toml rust/server-rs/Cargo.lock ./
 RUN mkdir -p src \
     && echo '' > src/lib.rs \
     && echo 'fn main() {}' > src/main.rs \
     && cargo build --release \
     && rm -rf src
 
-COPY src ./src
+COPY rust/server-rs/src ./src
 RUN touch src/main.rs src/lib.rs && cargo build --release
 
 FROM debian:bookworm-slim
@@ -34,11 +39,15 @@ RUN apt-get update \
 
 COPY --from=build /app/target/release/distroforge-server /usr/local/bin/distroforge-server
 
+# Interfaz ya compilada: DF_WEB_DIR la sirve junto a la API.
+COPY rust/web-ui/dist /app/web
+
 ENV PORT=8080 \
     DF_DB_PATH=/data/df.db \
-    QEMU_BIN=/usr/bin/qemu-system-x86_64
+    QEMU_BIN=/usr/bin/qemu-system-x86_64 \
+    DF_WEB_DIR=/app/web
 
-RUN mkdir -p /data && chown -R distroforge:distroforge /data
+RUN mkdir -p /data && chown -R distroforge:distroforge /data /app
 VOLUME ["/data"]
 USER distroforge
 EXPOSE 8080

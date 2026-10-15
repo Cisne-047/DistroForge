@@ -3,23 +3,31 @@
 #   1) fly launch --no-deploy --copy-config --name distroforge-server   (o edita `app`)
 #   2) fly volumes create df_data --size 1
 #   3) fly secrets set DF_DB_PATH=/data/df.db   (opcional: ya viene en [env])
-#   4) fly deploy
+#   4) cd rust/web-ui && trunk build --release --public-url /
+#      fly deploy . --config rust/server-rs/fly.toml    (desde la raíz del repo)
+#
+# El contexto del build es la RAÍZ del repositorio porque la imagen incluye la
+# interfaz compilada: el contenedor sirve la app y la API en el mismo origen, que
+# es lo que hace que la cookie de sesión viaje.
 #
 # O automático: guarda el token en el repositorio como secreto FLY_API_TOKEN
 # (Settings → Secrets and variables → Actions) y empuja un tag v*: el workflow
-# deploy-server.yml despliega solo.
+# deploy-server.yml compila la UI y despliega solo.
 
 app = "distroforge-server"
 primary_region = "mad"
 
 [build]
-  dockerfile = "Dockerfile"
+  # relativo a la raíz del repositorio (el contexto), no a este fichero
+  dockerfile = "rust/server-rs/Dockerfile"
 
 [env]
   PORT = "8080"
   # SQLite en el volumen: con el valor por defecto (:memory:) las cuentas y los
   # packs desaparecerían en cada reinicio.
   DF_DB_PATH = "/data/df.db"
+  # interfaz dentro de la imagen: se sirve en el mismo origen que la API
+  DF_WEB_DIR = "/app/web"
 
 [http_service]
   internal_port = 8080

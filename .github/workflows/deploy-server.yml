@@ -32,14 +32,31 @@ jobs:
         if: env.FLY_API_TOKEN != ''
         uses: actions/checkout@v4
 
+      - name: Toolchain
+        if: env.FLY_API_TOKEN != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Target wasm32
+        if: env.FLY_API_TOKEN != ''
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Trunk
+        if: env.FLY_API_TOKEN != ''
+        uses: jetli/trunk-action@v0.5.0
+
+      - name: Interfaz
+        if: env.FLY_API_TOKEN != ''
+        working-directory: rust/web-ui
+        run: trunk build --release --public-url /
+
       - name: flyctl
         if: env.FLY_API_TOKEN != ''
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Desplegar
         if: env.FLY_API_TOKEN != ''
-        working-directory: rust/server-rs
-        run: flyctl deploy --remote-only
+        # el contexto es la raíz porque la imagen incluye la interfaz compilada
+        run: flyctl deploy . --config rust/server-rs/fly.toml --remote-only
 
       - name: Comprobar que responde
         if: env.FLY_API_TOKEN != ''
