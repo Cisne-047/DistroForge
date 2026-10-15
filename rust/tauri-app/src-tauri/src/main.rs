@@ -2,14 +2,16 @@
 //!
 //! Expone el núcleo (`forge-core`) a un frontend web mediante dos comandos:
 //! `generate_project(cfg_json) -> {"ruta": "contenido"}` y
-//! `validate(cfg_json) -> [mensajes]`. El frontend vive en el build de Vite de
-//! la app existente (`frontendDist` apunta a `../../dist`).
+//! `validate(cfg_json) -> [mensajes]`. El frontend es la UI Leptos/WASM, que se
+//! sirve desde `frontendDist` (`../../web-ui/dist`, generado por
+//! `trunk build --release`); ver `beforeBuildCommand` en `tauri.conf.json`.
+//! Los comandos quedan como punto de extensión nativo: la UI actual genera el
+//! proyecto en WASM y no los invoca.
 //!
 //! NO se compila en el flujo normal del workspace (ver `rust/Cargo.toml`,
 //! `exclude`): las dependencias de Tauri tardan mucho. Para probarlo:
-//! `cd rust/tauri-app/src-tauri && cargo build` (requiere los prerequisitos
-//! habituales de Tauri 2 por plataforma) y `npm run build` en la raíz del repo
-//! para generar `dist/`.
+//! `cd rust/tauri-app/src-tauri && cargo tauri build` (requiere los
+//! prerequisitos habituales de Tauri 2 por plataforma).
 //!
 //! Nota: `expect` en `main` es código de aplicación (arranque), no ruta de
 //! librería; la regla "sin unwrap" aplica al core.

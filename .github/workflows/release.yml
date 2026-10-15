@@ -1,43 +1,95 @@
 name: release
+
+# Publica la app de escritorio: al empujar un tag v* crea la GitHub Release con
+# los paquetes de Linux (.deb/.rpm/.AppImage) y Windows (.msi/.exe). Con
+# workflow_dispatch solo construye y sube artefactos, sin publicar nada: así se
+# puede verificar el empaquetado sin cortar una versión.
+
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  tauri:
+  build:
+    name: paquetes (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            bundles: deb,rpm,appimage
+          - platform: windows-latest
+            bundles: msi,nsis
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependencias de Tauri (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Target wasm32
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Trunk
+        uses: jetli/trunk-action@v0.5.0
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/tauri-app/src-tauri
+
+      - name: Instalar Tauri CLI
+        run: cargo install tauri-cli --version '^2' --locked
+
+      # beforeBuildCommand de tauri.conf.json compila la UI Leptos con Trunk.
+      - name: Empaquetar
+        working-directory: rust/tauri-app/src-tauri
+        run: cargo tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Subir artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: distroforge-${{ matrix.platform }}
+          path: |
+            rust/tauri-app/src-tauri/target/release/bundle/deb/*.deb
+            rust/tauri-app/src-tauri/target/release/bundle/rpm/*.rpm
+            rust/tauri-app/src-tauri/target/release/bundle/appimage/*.AppImage
+            rust/tauri-app/src-tauri/target/release/bundle/msi/*.msi
+            rust/tauri-app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  publish:
+    name: publicar release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Dependencias de Tauri (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-      - name: Trunk
-        uses: jetli/trunk-action@v0.5.0
-      - name: UI de la app de escritorio
-        run: |
-          rustup target add wasm32-unknown-unknown
-          trunk build --release
-        working-directory: rust/web-ui
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+
+      - name: Descargar paquetes
+        uses: actions/download-artifact@v4
         with:
-          workspaces: |
-            rust
-            rust/tauri-app/src-tauri
-      - name: Construir binario de escritorio
-        run: cargo tauri build || cargo install tauri-cli --version '^2' && cargo tauri build
-        working-directory: rust/tauri-app/src-tauri
-      - name: Subir artefactos
-        uses: actions/upload-artifact@v4
-        with:
-          name: distroforge-desktop
-          path: |
-            rust/tauri-app/src-tauri/target/release/bundle/deb/*.deb
-            rust/tauri-app/src-tauri/target/release/bundle/appimage/*.AppImage
-            rust/tauri-app/src-tauri/target/release/bundle/rpm/*.rpm
-          if-no-files-found: warn
+          path: dist
+          merge-multiple: true
+
+      - name: Crear la release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "DistroForge $GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/**
