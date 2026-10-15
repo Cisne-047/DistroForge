@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Concepto 2: diamante armero">
+  <title>Concepto 2 · Diamante armero</title>
+  <rect width="120" height="120" rx="26" fill="#0F1211"/>
+  <g transform="rotate(45 60 60)">
+    <rect x="16" y="16" width="88" height="88" fill="none" stroke="#4FBF85" stroke-width="9"/>
+    <rect x="16" y="16" width="44" height="44" fill="#4FBF85"/>
+    <rect x="60" y="60" width="44" height="44" fill="#4FBF85"/>
+  </g>
+  <ellipse cx="60" cy="61.5" rx="10.8" ry="13.8" fill="#E9EDEA"/>
+  <ellipse cx="54.6" cy="55" rx="2.6" ry="4.3" fill="#0F1211"/>
+  <ellipse cx="65.4" cy="55" rx="2.6" ry="4.3" fill="#0F1211"/>
+  <polygon points="56,63.6 64,63.6 60,71.7" fill="#E0A33C"/>
+</svg>
