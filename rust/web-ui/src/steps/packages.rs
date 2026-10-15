@@ -317,7 +317,10 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
                                     }
                                 },
                                 Err(e) => {
-                                    util::alert(&format!("No se pudo cargar la galería: {e}"));
+                                    util::alert(&format!(
+                                        "No se pudo cargar la galería incluida en la app \
+                                         (gallery/index.json): {e}"
+                                    ));
                                 }
                             }
                         });
