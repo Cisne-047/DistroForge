@@ -239,11 +239,17 @@ pub struct GalleryIndex {
     pub packs: Vec<GalleryEntry>,
 }
 
-pub const GALLERY_INDEX_URL: &str =
-    "https://raw.githubusercontent.com/Cisne-047/DistroForge/main/gallery/index.json";
+/// Índice de la galería comunitaria.
+///
+/// Ruta **relativa**: Trunk copia el directorio `gallery/` del repo dentro de
+/// `dist/` (ver `index.html`, `data-trunk rel="copy-dir"`), así que la galería
+/// viaja con la app y no depende de que el repo sea público. Funciona igual en
+/// GitHub Pages, en `trunk serve` y en el binario de escritorio (Tauri sirve
+/// `rust/web-ui/dist` como frontend).
+pub const GALLERY_INDEX_URL: &str = "gallery/index.json";
 
-pub const GALLERY_BASE: &str =
-    "https://raw.githubusercontent.com/Cisne-047/DistroForge/main/gallery/";
+/// Prefijo para resolver los `file` del índice (`packs/nas.json` → `gallery/packs/nas.json`).
+pub const GALLERY_BASE: &str = "gallery/";
 
 /// Carga y parsea un pack desde una URL.
 pub async fn fetch_pack(url: &str) -> Result<Pack, String> {
