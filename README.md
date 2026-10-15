@@ -4,6 +4,7 @@ Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paq
 
 - **App web**: <https://cisne-047.github.io/DistroForge/>
 - **App de escritorio**: `.deb`, `.rpm`, `.AppImage`, `.msi` y `.exe` en [Releases](../../releases)
+- **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 
 Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI, el backend con Test Drive VNC (`axum`) y la app de escritorio (Tauri 2). La app React/TS original y el backend Node viven en `legacy/` como referencia y suite de paridad.
 
