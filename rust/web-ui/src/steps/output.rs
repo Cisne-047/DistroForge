@@ -62,9 +62,9 @@ pub fn OutputStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
 
     view! {
         <section>
-            <h2>"5. Construir"</h2>
+            <h2>"Revisa y construye"</h2>
             <p class="hint">
-                {move || format!("Motor: {}. Revisa la receta generada y descarga el proyecto.", base_by_id(cfg.get().base).engine)}
+                {move || format!("Motor: {}. Revisa la receta generada, descarga el proyecto o pruébalo en el navegador.", base_by_id(cfg.get().base).engine)}
             </p>
             {move || {
                 let opts = out_options();
@@ -73,7 +73,7 @@ pub fn OutputStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
                     view! {
                         <p class="hint">
                             {if advanced {
-                                "Modo advanced: salida ISO única (remaster de tu ISO base).".to_string()
+                                "Modo avanzado: salida ISO única (remaster de tu ISO base).".to_string()
                             } else {
                                 "Motor manual: el zip incluye lista de paquetes y guía, sin build automático.".to_string()
                             }}

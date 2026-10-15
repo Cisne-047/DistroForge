@@ -16,7 +16,7 @@ use crate::util;
 const STEPS: [(&str, &str); 6] = [
     ("base", "1 · Base"),
     ("system", "2 · Sistema"),
-    ("branding", "3 · Branding"),
+    ("branding", "3 · Identidad"),
     ("repos", "4 · Repos"),
     ("packages", "5 · Paquetes"),
     ("output", "6 · Construir"),
@@ -124,9 +124,22 @@ pub fn App() -> impl IntoView {
                     .iter()
                     .enumerate()
                     .map(|(i, s)| {
+                        // Contadores en la pestaña, como en Studio: sólo si hay algo.
+                        let badge = move || -> Option<String> {
+                            let c = cfg.get();
+                            let n = match s.0 {
+                                "packages" => c.packages.len() + c.flatpak_apps.len(),
+                                "repos" => c.repos.len(),
+                                "system" => c.users.len() + c.services.len(),
+                                "branding" => c.extra_files.len(),
+                                _ => 0,
+                            };
+                            (n > 0).then(|| n.to_string())
+                        };
                         view! {
                             <button class:on=move || step.get() == i on:click=move |_| step.set(i)>
                                 {s.1}
+                                {move || badge().map(|n| view! { <span class="tag">{n}</span> })}
                             </button>
                         }
                     })

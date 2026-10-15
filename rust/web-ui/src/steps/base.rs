@@ -24,10 +24,11 @@ pub fn BaseStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
     });
     view! {
         <section>
-            <h2>"1. Base"</h2>
+            <h2>"Elige la base del sistema"</h2>
             <p class="hint">
-                "Distribución sobre la que montas tu distro. El motor de construcción se elige solo:
-                KIWI (openSUSE), live-build (Debian), mkarchiso (Arch) o kickstart (Fedora)."
+                "La familia y la versión deciden el motor de construcción, los repos y los valores por
+                defecto del resto de pasos. El motor se deduce solo: KIWI NG para openSUSE, live-build
+                para Debian, mkarchiso para Arch y kickstart para Fedora."
             </p>
             <h3>"Plantillas rápidas"</h3>
             <div class="chips">
@@ -144,7 +145,7 @@ pub fn BaseStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
                         .collect_view()
                 }}
             </div>
-            <h3>"Modo advanced (experimental)"</h3>
+            <h3>"Modo avanzado (experimental)"</h3>
             <p class="hint">
                 "Remasteriza una ISO que tú aportas (cualquier distro exótica): se extrae, se aplica tu
                 config en un chroot y se reconstruye. Salida ISO única."
