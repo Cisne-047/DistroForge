@@ -47,16 +47,30 @@ La petición era cruzar el emblema de la **Black Armory** (Destino 2) con **Tux*
 | 4 | ![Marca de forja](conceptos/04-marca-de-forja.svg) | Huella de Tux estampada en un hexágono |
 | 5 | ![Tux facetado](conceptos/05-tux-facetado.svg) | Tux entero en facetas planas, con chispa al hombro |
 
-**Se implementó el 2** por tres razones: es el más identitario (el rombo es la seña de la Black Armory), funciona en un solo color y se reduce a **tres manchas**, así que sobrevive a 16 px sin versión simplificada.
+**El logotipo definitivo es el 3 llevado a ilustración**: el autor del proyecto aportó un dibujo original de Tux forjando en el yunque, que es el que usa la aplicación. Cuenta el oficio y el pingüino a la vez, y funciona como mascota. Los cinco conceptos de arriba quedan como exploración y como alternativa si algún día se quiere un emblema más abstracto.
 
-![Marca a 16, 32, 64 y 128 px](capturas/icono-tamanos.png)
+![El logotipo y los tamaños que se derivan de él](capturas/icono-tamanos.png)
+
+## Cómo se derivan los recursos del logotipo
+
+Todo sale de un único fichero, `docs/diseno/marca-ilustracion.png` (1275×1234, fondo crema `#FDFAF0`), con `python tools/make_icons.py`:
+
+| Recurso | Qué es | Dónde |
+|---|---|---|
+| Icono de la app | La ilustración completa sobre un tile crema redondeado | `rust/tauri-app/src-tauri/icons/` — PNG de 32 a 1024 y `.ico` multirresolución |
+| Favicon y apple-touch-icon | El mismo tile a 64 y 180 px | `rust/web-ui/public/` |
+| Marca de la cabecera | Recorte de la cabeza (405,145 → 815,555) | `rust/web-ui/public/marca-cabeza.png` |
+
+Dos decisiones que conviene no deshacer sin querer:
+
+- La cabecera usa **la cabeza**, no la escena: a 26 px el yunque y el martillo son ruido, la cara se lee.
+- El icono mantiene el **fondo crema del original** en vez de recolorearlo al grafito de la interfaz, porque sobre grafito el pingüino y el yunque (negros) desaparecerían.
 
 ## Cambiar la marca
 
-1. Edita `docs/diseno/marca.svg` y el SVG en línea de la cabecera (`rust/web-ui/src/app.rs`, clase `brand`).
-2. Regenera los iconos y el favicon: `python tools/make_icons.py` (dibuja la marca con Pillow; la geometría está en `tools/make_icons.py`).
-
-Los ficheros que produce: `icon.png` y `icon-512.png` (escritorio), `32x32.png`, `128x128.png`, `128x128@2x.png`, `256x256.png`, `icon.ico` multirresolución (Windows), y `favicon.png` + `apple-touch-icon.png` para la web.
+1. Sustituye `docs/diseno/marca-ilustracion.png` por la nueva ilustración (fondo plano y claro).
+2. Si cambia el encuadre, ajusta `HEAD_BOX` en `tools/make_icons.py`.
+3. `python tools/make_icons.py` regenera iconos, favicon y marca de cabecera.
 
 > macOS necesitaría además un `.icns`, que hoy no se genera porque no hay destino macOS en la matriz de release.
 
