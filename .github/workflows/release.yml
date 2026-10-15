@@ -17,14 +17,14 @@ jobs:
   build:
     name: paquetes (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
+    # Ningún empaquetado real (en frío) pasa de ~35 min; el tope evita que un
+    # cuelgue se coma el timeout de 6 h por defecto.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
+      # Linux: deb + rpm + appimage. Windows: msi + nsis.
       matrix:
-        include:
-          - platform: ubuntu-22.04
-            bundles: deb,rpm,appimage
-          - platform: windows-latest
-            bundles: msi,nsis
+        platform: [ubuntu-22.04, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,27 +61,84 @@ jobs:
           key: tauri-cli-${{ runner.os }}-v2
 
       - name: Instalar Tauri CLI
-        run: cargo install tauri-cli --version '^2' --locked
+        shell: bash
+        run: |
+          # La caché guarda el binario, pero `cargo install` recompila la CLI
+          # aunque ya exista: en el run 38783927835 tardó 11m45s en Linux y
+          # 19m26s en Windows. Solo instalamos si el binario cacheado no
+          # arranca; si falta o está corrupto, se cae al `cargo install`.
+          if cargo tauri --version >/dev/null 2>&1; then
+            echo "cargo-tauri ya disponible: $(cargo tauri --version)"
+          else
+            cargo install tauri-cli --version '^2' --locked
+          fi
 
       # La UI se compila aquí y no en `beforeBuildCommand`: los hooks de Tauri
       # se ejecutan desde la raíz del proyecto (rust/tauri-app), no desde
       # src-tauri, así que una ruta relativa `../../web-ui` no resuelve.
+      #
+      # `--public-url /` es obligatorio en el escritorio: `rust/web-ui/Trunk.toml`
+      # fija `/DistroForge/` para GitHub Pages, y dentro del WebView de Tauri
+      # esos assets absolutos no existen (ventana en blanco).
       - name: UI (Trunk)
         working-directory: rust/web-ui
-        run: trunk build --release
+        run: trunk build --release --public-url /
 
-      - name: Empaquetar
+      - name: Empaquetar (deb + rpm)
+        if: matrix.platform == 'ubuntu-22.04'
         working-directory: rust/tauri-app/src-tauri
-        run: cargo tauri build --bundles ${{ matrix.bundles }}
+        run: cargo tauri build --bundles deb,rpm
 
-      - name: Subir artefactos
+      # Los .deb/.rpm se suben antes de intentar el AppImage: así un fallo del
+      # AppImage no tira a la basura los paquetes ya construidos.
+      - name: Subir paquetes Linux (deb + rpm)
+        if: matrix.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
-          name: distroforge-${{ matrix.platform }}
+          name: distroforge-linux-deb-rpm
           path: |
             rust/tauri-app/src-tauri/target/release/bundle/deb/*.deb
             rust/tauri-app/src-tauri/target/release/bundle/rpm/*.rpm
-            rust/tauri-app/src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Empaquetar (AppImage)
+        if: matrix.platform == 'ubuntu-22.04'
+        working-directory: rust/tauri-app/src-tauri
+        shell: bash
+        run: |
+          # El bundler de AppImage descarga linuxdeploy y AppRun de GitHub
+          # Releases en tiempo de empaquetado. Un 504 del CDN tumbaba el job
+          # entero (run 38783927835), así que reintentamos con espera.
+          for intento in 1 2 3; do
+            if cargo tauri build --bundles appimage; then
+              echo "AppImage generado en el intento $intento"
+              exit 0
+            fi
+            echo "::warning::el intento $intento de AppImage ha fallado"
+            sleep 20
+          done
+          echo "::error::AppImage falló en los 3 intentos"
+          exit 1
+
+      - name: Subir paquete Linux (AppImage)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: distroforge-linux-appimage
+          path: rust/tauri-app/src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Empaquetar (msi + nsis)
+        if: matrix.platform == 'windows-latest'
+        working-directory: rust/tauri-app/src-tauri
+        run: cargo tauri build --bundles msi,nsis
+
+      - name: Subir paquetes Windows (msi + nsis)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: distroforge-windows-msi-nsis
+          path: |
             rust/tauri-app/src-tauri/target/release/bundle/msi/*.msi
             rust/tauri-app/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
