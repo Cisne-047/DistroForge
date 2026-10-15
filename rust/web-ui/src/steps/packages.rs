@@ -279,9 +279,9 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
             </div>
             <h3>"Galería comunitaria"</h3>
             <p class="hint">
-                "Packs compartidos por la comunidad en la carpeta "
+                "Packs de la comunidad que viajan dentro de la app (carpeta "
                 <code>"gallery/"</code>
-                " del repo — se cargan desde GitHub y se amplían con un PR."
+                " del repositorio) y se amplían con un pull request. Si tienes uno suelto, impórtalo por URL abajo."
             </p>
             {move || if !gallery.get().is_empty() {
                 view! {
@@ -370,7 +370,7 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
             <p class="hint">
                 "Conecta un backend ("
                 <code>"rust/server-rs"</code>
-                ") para cuentas, búsqueda server-side y Test Drive VNC interactivo. Sin él, todo lo demás funciona igual."
+                ") para tener cuentas, búsqueda en el servidor y Test Drive en el navegador. Sin él, generar la receta y descargarla funciona igual."
             </p>
             <div class="fields">
                 <label class="field">
