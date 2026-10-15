@@ -162,7 +162,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # `download-artifact` con `merge-multiple` deja los paquetes en
+          # subcarpetas (dist/deb/, dist/rpm/, dist/appimage/, dist/msi/,
+          # dist/nsis/), así que `dist/**` expandía a DIRECTORIOS y
+          # `gh release create` espera ficheros. Listamos los ficheros reales,
+          # sea cual sea el anidamiento que deje la descarga.
+          mapfile -t paquetes < <(find dist -type f | sort)
+          if [ "${#paquetes[@]}" -eq 0 ]; then
+            echo "::error::no hay paquetes que publicar en dist/"
+            exit 1
+          fi
+          printf 'Adjuntando %d paquetes:\n' "${#paquetes[@]}"
+          printf '  %s\n' "${paquetes[@]}"
           gh release create "$GITHUB_REF_NAME" \
             --title "DistroForge $GITHUB_REF_NAME" \
             --generate-notes \
-            dist/**
+            "${paquetes[@]}"
