@@ -76,22 +76,23 @@ pub fn App() -> impl IntoView {
             <header>
                 <span class="brand">
                     <svg class="mark" viewBox="0 0 120 120" aria-hidden="true">
-                        <polygon points="60,6 107,33 107,87 60,114 13,87 13,33" fill="var(--accent)" />
-                        <polygon
-                            points="60,27 89,44 89,76 60,93 31,76 31,44"
-                            fill="none"
-                            stroke="var(--on-accent)"
-                            stroke-opacity=".5"
-                            stroke-width="7"
-                        />
-                        <rect
-                            x="40"
-                            y="55"
-                            width="42"
-                            height="10"
-                            fill="var(--on-accent)"
-                            transform="rotate(-34 60 60)"
-                        />
+                        <g transform="rotate(45 60 60)">
+                            <rect
+                                x="16"
+                                y="16"
+                                width="88"
+                                height="88"
+                                fill="none"
+                                stroke="var(--accent)"
+                                stroke-width="9"
+                            />
+                            <rect x="16" y="16" width="44" height="44" fill="var(--accent)" />
+                            <rect x="60" y="60" width="44" height="44" fill="var(--accent)" />
+                        </g>
+                        <ellipse cx="60" cy="61.5" rx="10.8" ry="13.8" fill="var(--ink)" />
+                        <ellipse cx="54.6" cy="55" rx="2.6" ry="4.3" fill="var(--bg)" />
+                        <ellipse cx="65.4" cy="55" rx="2.6" ry="4.3" fill="var(--bg)" />
+                        <polygon points="56,63.6 64,63.6 60,71.7" fill="#e0a33c" />
                     </svg>
                     "DistroForge"
                 </span>

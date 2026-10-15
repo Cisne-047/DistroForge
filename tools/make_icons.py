@@ -24,8 +24,9 @@ PUBLIC = ROOT / "rust" / "web-ui" / "public"
 
 BG_TOP = (32, 35, 40)
 BG_BOTTOM = (13, 14, 17)
-MARK = (240, 242, 245)
-ACCENT = (31, 122, 76)  # verde "Grafito & Verde"
+MARK = (242, 245, 243)
+ACCENT = (79, 191, 133)  # verde del sistema "Grafito & Verde"
+AMBER = (224, 163, 60)  # pico de Tux
 
 
 def lerp(a, b, t):
@@ -66,25 +67,26 @@ def render(size=BASE):
     img.paste(Image.new("RGB", (s, s), (255, 255, 255)), (0, 0),
               Image.composite(sheen, Image.new("L", (s, s), 0), mask))
 
+    # marca: "diamante armero" — rombo arlequinado con la cabeza de Tux en
+    # negativo dentro. Dos cuadrantes opuestos en verde y la silueta blanca con
+    # pico ámbar: se lee a 16 px porque sólo hay tres manchas.
     cx = cy = s / 2
-    d.polygon(hexagon(cx, cy, s * 0.315, -90), outline=MARK + (255,), width=round(s * 0.042))
-    inner = hexagon(cx, cy, s * 0.185, -90)
-    d.polygon(inner, outline=MARK + (120,), width=round(s * 0.022))
+    half = s * 0.335
+    top, right = (cx, cy - half), (cx + half, cy)
+    bottom, left = (cx, cy + half), (cx - half, cy)
+    d.polygon([top, right, bottom, left], outline=ACCENT + (255,), width=round(s * 0.05))
+    d.polygon([top, right, (cx, cy)], fill=ACCENT + (255,))
+    d.polygon([left, bottom, (cx, cy)], fill=ACCENT + (255,))
 
-    # barra de forja, recortada al hexágono interior
-    ang = math.radians(-58)
-    w, length = s * 0.085, s * 0.42
-    dx, dy = math.cos(ang) * length / 2, math.sin(ang) * length / 2
-    nx, ny = -math.sin(ang) * w / 2, math.cos(ang) * w / 2
-    bar = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    ImageDraw.Draw(bar).polygon(
-        [(cx - dx + nx, cy - dy + ny), (cx + dx + nx, cy + dy + ny),
-         (cx + dx - nx, cy + dy - ny), (cx - dx - nx, cy - dy - ny)],
-        fill=ACCENT + (255,),
+    # cara de Tux: óvalo blanco con ojos oscuros y pico ámbar
+    d.ellipse(
+        [cx - s * 0.090, cy - s * 0.100, cx + s * 0.090, cy + s * 0.130],
+        fill=MARK + (255,),
     )
-    clip = Image.new("L", (s, s), 0)
-    ImageDraw.Draw(clip).polygon(inner, fill=255)
-    img.paste(bar, (0, 0), Image.composite(bar.split()[3], Image.new("L", (s, s), 0), clip))
+    d.ellipse([cx - s * 0.058, cy - s * 0.058, cx - s * 0.014, cy + s * 0.014], fill=BG_BOTTOM + (255,))
+    d.ellipse([cx + s * 0.014, cy - s * 0.058, cx + s * 0.058, cy + s * 0.014], fill=BG_BOTTOM + (255,))
+    d.polygon([(cx - s * 0.034, cy + s * 0.030), (cx + s * 0.034, cy + s * 0.030),
+               (cx, cy + s * 0.098)], fill=AMBER + (255,))
 
     return img.resize((size, size), Image.LANCZOS)
 
