@@ -1,0 +1,57 @@
+name: server-image
+
+# Publica la imagen del backend en GitHub Container Registry, que es lo que
+# consumen los despliegues (Fly.io, Render, un VPS con docker compose…).
+# :latest en main y :sha-<corto> en cada build; :vX.Y.Z al empujar un tag.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "rust/server-rs/**"
+      - ".github/workflows/server-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Etiquetas
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/cisne-047/distroforge-server
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Construir y publicar
+        uses: docker/build-push-action@v6
+        with:
+          context: rust/server-rs
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

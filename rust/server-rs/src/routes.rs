@@ -87,10 +87,22 @@ pub fn build_router_with_drives(db: Connection, drives: DriveManager) -> Router 
         )
         .route("/api/testdrive/available", get(available))
         .route("/api/testdrive/{id}", delete(stop_session))
+        .route("/api/health", get(health))
         .route("/vnc.html", get(vnc_page))
         .route("/ws/{id}", get(ws_bridge))
         .layer(cors)
         .with_state(state)
+}
+
+/// Estado del servicio. Lo usan el `HEALTHCHECK` del contenedor y las
+/// plataformas de hosting para saber si el proceso está vivo.
+async fn health() -> Response {
+    Json(json!({
+        "status": "ok",
+        "service": "distroforge-server",
+        "version": env!("CARGO_PKG_VERSION"),
+    }))
+    .into_response()
 }
 
 // ---------- helpers ----------
