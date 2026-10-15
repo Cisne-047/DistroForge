@@ -1,6 +1,6 @@
 [package]
 name = "forge-cli"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
 description = "CLI `forge` de DistroForge: vuelca a disco el proyecto generado (equivalente a scripts/dump.ts)"
 license = "MIT"
