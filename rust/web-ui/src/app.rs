@@ -75,25 +75,7 @@ pub fn App() -> impl IntoView {
         <div class="app">
             <header>
                 <span class="brand">
-                    <svg class="mark" viewBox="0 0 120 120" aria-hidden="true">
-                        <g transform="rotate(45 60 60)">
-                            <rect
-                                x="16"
-                                y="16"
-                                width="88"
-                                height="88"
-                                fill="none"
-                                stroke="var(--accent)"
-                                stroke-width="9"
-                            />
-                            <rect x="16" y="16" width="44" height="44" fill="var(--accent)" />
-                            <rect x="60" y="60" width="44" height="44" fill="var(--accent)" />
-                        </g>
-                        <ellipse cx="60" cy="61.5" rx="10.8" ry="13.8" fill="var(--ink)" />
-                        <ellipse cx="54.6" cy="55" rx="2.6" ry="4.3" fill="var(--bg)" />
-                        <ellipse cx="65.4" cy="55" rx="2.6" ry="4.3" fill="var(--bg)" />
-                        <polygon points="56,63.6 64,63.6 60,71.7" fill="#e0a33c" />
-                    </svg>
+                    <img class="mark" src="marca-cabeza.png" alt="" width="26" height="26" />
                     "DistroForge"
                 </span>
                 <input

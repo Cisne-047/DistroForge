@@ -107,12 +107,14 @@ header {
   white-space: nowrap;
 }
 
-/* marca: el mismo hexágono con barra de forja que el icono de la app y el
-   favicon (tools/make_icons.py) */
+/* marca: la cabeza de Tux recortada del logotipo (a 26 px la escena entera del
+   yunque es ilegible; la cara no). El icono de la app y el favicon sí llevan la
+   ilustración completa. */
 .brand .mark {
   width: 26px;
   height: 26px;
   flex: none;
+  border-radius: 7px;
 }
 
 .name-input {

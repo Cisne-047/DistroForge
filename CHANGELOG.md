@@ -20,6 +20,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 
 ### Cambiado
 
+- **Identidad definitiva**: el logotipo es la ilustración original de Tux forjando en el yunque, de la que se derivan todos los recursos (icono de la app, favicon, apple-touch-icon y marca de la cabecera, recortada a la cabeza porque a 26 px la escena es ilegible) con `tools/make_icons.py`. Se añade la licencia MIT con la marca excluida.
 - **Rediseño completo de la interfaz**: sistema *Grafito & Verde*, variante oscura. Una sola familia tipográfica, un único acento, filetes de 1 px, cifras tabulares, controles propios y cero degradados. Sustituye el tema azul marino con degradados violeta→teal y cristal.
 - **Copy de los seis pasos**: títulos coherentes con las pestañas, entradillas que explican qué se decide y qué se deduce solo, y avisos que dicen el porqué y qué hacer. `Branding` pasa a `Identidad` y el `Modo advanced` a `Modo avanzado`.
 - **Versiones alineadas** en 0.5.0: `forge-core`, `forge-cli`, `forge-wasm`, `web-ui` y `server-rs` estaban en 0.1.0 mientras el proyecto iba por la 0.4.0.
@@ -27,8 +28,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 
 ### Pendiente
 
-- Desplegar el backend y dejar una URL por defecto en la UI.
-- Elegir el logotipo definitivo (hay cinco conceptos en `out/design/logos.html`) y, con él, regenerar iconos.
+- Desplegar el backend: ya está automatizado (secreto `FLY_API_TOKEN` + tag) pero no desplegado, así que la UI no trae URL por defecto.
 - Firma de los paquetes de escritorio y auto-actualización.
 
 ## Versiones anteriores
