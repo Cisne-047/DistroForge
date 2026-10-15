@@ -1,0 +1,25 @@
+# Levanta el backend en local: docker compose up --build
+#
+# La UI apunta a http://localhost:8080 desde la sección "Servidor".
+services:
+  server:
+    build: .
+    image: ghcr.io/cisne-047/distroforge-server:latest
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      # SQLite en disco, dentro del volumen: las cuentas y los packs sobreviven
+      # a un reinicio del contenedor (por defecto el motor usa :memory:).
+      DF_DB_PATH: /data/df.db
+      QEMU_BIN: /usr/bin/qemu-system-x86_64
+    volumes:
+      - df-data:/data
+    # El Test Drive necesita KVM para ser usable. Descomenta en Linux con KVM
+    # (en Docker Desktop para Windows/macOS no existe /dev/kvm):
+    # devices:
+    #   - /dev/kvm:/dev/kvm
+    restart: unless-stopped
+
+volumes:
+  df-data:
