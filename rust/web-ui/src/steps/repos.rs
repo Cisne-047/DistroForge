@@ -9,10 +9,11 @@ use crate::util;
 pub fn ReposStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
     view! {
         <section>
-            <h2>"3. Repositorios custom"</h2>
+            <h2>"Repositorios adicionales"</h2>
             <p class="hint">
-                "URLs extra: OBS, COPR, tu propio mirror... La URL va tal cual al gestor de paquetes
-                del motor (zypper/apt/pacman/dnf). Si el repo necesita clave GPG, pon la URL de la key."
+                "Añade repos que no vengan en la base: OBS, COPR, tu propio mirror… La URL va tal cual
+                al gestor de paquetes del motor (zypper, apt, pacman o dnf). Si el repo exige clave
+                GPG, pega también la URL de la clave."
             </p>
             {move || {
                 cfg.get()

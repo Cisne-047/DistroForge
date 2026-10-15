@@ -24,8 +24,12 @@ pub fn SystemStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
     };
     view! {
         <section>
-            <h2>"2. Sistema"</h2>
-            <p class="hint">"Identidad, usuario e idioma de tu distro."</p>
+            <h2>"Sistema y usuarios"</h2>
+            <p class="hint">
+                "Hostname, cuenta principal, idioma y zona, red, cortafuegos y lo que se ejecuta al
+                arrancar. Los valores desatendidos se traducen a preseed, AutoYaST o kickstart según
+                la familia."
+            </p>
             <div class="fields">
                 <label class="field">
                     "Hostname"
@@ -48,7 +52,7 @@ pub fn SystemStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
                     />
                 </label>
                 <label class="field">
-                    "Contraseña (va en claro a la receta de build)"
+                    "Contraseña (viaja en claro en la receta: usa una provisional)"
                     <input
                         type="password"
                         prop:value=move || cfg.get().system.password.clone()

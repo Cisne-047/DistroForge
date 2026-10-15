@@ -22,11 +22,37 @@ const STEPS: [(&str, &str); 6] = [
     ("output", "6 · Construir"),
 ];
 
+/// Paso inicial: `?paso=N` o `#paso=N` (1..6). Permite enlazar directamente a un
+/// paso concreto; sin parámetro se empieza por el primero.
+fn initial_step() -> usize {
+    let loc = util::window().location();
+    let raw = loc
+        .search()
+        .ok()
+        .and_then(|s| s.strip_prefix("?paso=").map(|v| v.to_string()))
+        .or_else(|| {
+            loc.hash()
+                .ok()
+                .and_then(|h| h.strip_prefix("#paso=").map(|v| v.to_string()))
+        });
+    match raw {
+        Some(v) => v
+            .split(['&', '#', '/'])
+            .next()
+            .unwrap_or("")
+            .parse::<usize>()
+            .ok()
+            .map(|n| n.saturating_sub(1).min(STEPS.len() - 1))
+            .unwrap_or(0),
+        None => 0,
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let cfg = RwSignal::new(load_config());
     let projects: RwSignal<BTreeMap<String, DistroConfig>> = RwSignal::new(load_projects());
-    let step = RwSignal::new(0usize);
+    let step = RwSignal::new(initial_step());
 
     // Autoguardado en localStorage (sin espacio/modo privado: la app sigue).
     Effect::new(move |_| {

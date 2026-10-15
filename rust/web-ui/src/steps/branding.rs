@@ -16,10 +16,10 @@ pub fn BrandingStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
     let label = Signal::derive(move || base_by_id(cfg.get().base).label.to_string());
     view! {
         <section>
-            <h2>"3. Branding"</h2>
+            <h2>"Identidad visual"</h2>
             <p class="hint">
-                "Cómo luce y arranca tu distro: mensaje de bienvenida, fondo de pantalla y menú GRUB.
-                La vista previa refleja la config al instante."
+                "Cómo se ve y cómo arranca tu distro: mensaje de bienvenida, fondo, logo y menú de
+                GRUB. La vista previa se actualiza al instante con lo que escribas."
             </p>
             <div class="branding-grid">
                 <div>

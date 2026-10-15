@@ -81,13 +81,13 @@ pub fn PackagesStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
 
     view! {
         <section>
-            <h2>"4. Paquetes"</h2>
+            <h2>"Paquetes y apps"</h2>
             <p class="hint">
                 {move || {
                     let c = cfg.get();
                     format!(
-                        "Los nombres deben existir en los repos de {}. Al cambiar de base, revisa que
-                        sigan siendo válidos (cada distro nombra los paquetes distinto).",
+                        "Los nombres deben existir en los repos de {}. Cambiar de base invalida parte
+                        de la lista, porque cada distro nombra los paquetes a su manera.",
                         base_by_id(c.base).label,
                     )
                 }}
