@@ -4,6 +4,22 @@ El backend (`rust/server-rs`) da cuentas, galería con FTS5 y Test Drive VNC. La
 app web funciona sin él (todo lo demás se genera en el navegador con WASM): si
 no hay backend, la sección *Servidor* simplemente queda sin usar.
 
+## La vía corta: un secreto y un tag
+
+`.github/workflows/deploy-server.yml` despliega en Fly.io sin que nadie tenga que
+pasar credenciales por ningún sitio:
+
+1. Crea la app y el volumen una sola vez (necesita tu cuenta):
+   `fly launch --no-deploy --copy-config --name distroforge-server` dentro de
+   `rust/server-rs`, y `fly volumes create df_data --size 1`.
+2. Guarda el token en **Settings → Secrets and variables → Actions** como
+   `FLY_API_TOKEN` (`fly auth token`).
+3. Empuja un tag `v*` o lanza el workflow a mano.
+
+El workflow **no falla si el secreto no existe**: lo dice por el log y se queda
+en verde, para no llenar de avisos el repositorio. Al terminar comprueba
+`https://<app>.fly.dev/api/health`.
+
 ## Variables de entorno
 
 | Variable | Por defecto | Para qué |
