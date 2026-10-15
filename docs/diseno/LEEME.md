@@ -53,23 +53,26 @@ La petición era cruzar el emblema de la **Black Armory** (Destino 2) con **Tux*
 
 ## Cómo se derivan los recursos del logotipo
 
+La **marca** es la cabeza de Tux centrada en la cara. La **mascota** es la ilustración completa (el pingüino forjando), que vive aquí y en el README; no se usa como icono porque la escena es casi cuadrada pero el yunque ocupa la mitad derecha, así que el pingüino aparecía pegado al borde izquierdo.
+
 Todo sale de un único fichero, `docs/diseno/marca-ilustracion.png` (1275×1234, fondo crema `#FDFAF0`), con `python tools/make_icons.py`:
 
-| Recurso | Qué es | Dónde |
+| Recurso | Tamaños | Dónde |
 |---|---|---|
-| Icono de la app | La ilustración completa sobre un tile crema redondeado | `rust/tauri-app/src-tauri/icons/` — PNG de 32 a 1024 y `.ico` multirresolución |
-| Favicon y apple-touch-icon | El mismo tile a 64 y 180 px | `rust/web-ui/public/` |
-| Marca de la cabecera | Recorte de la cabeza (405,145 → 815,555) | `rust/web-ui/public/marca-cabeza.png` |
+| Icono de la app | PNG de 32 a 1024 y `.ico` multirresolución | `rust/tauri-app/src-tauri/icons/` |
+| Favicon y apple-touch-icon | 64 y 180 px | `rust/web-ui/public/` |
+| Marca de la cabecera | 128 px | `rust/web-ui/public/marca-cabeza.png` |
 
-Dos decisiones que conviene no deshacer sin querer:
+Detalles que conviene no deshacer sin querer:
 
-- La cabecera usa **la cabeza**, no la escena: a 26 px el yunque y el martillo son ruido, la cara se lee.
+- El recorte se centra en la **cara** (la única zona de blanco puro, restringida a la mitad superior para que la barriga no arrastre el centro), no en el pico ni en la escena. Centrar en el pico dejaba la cara desplazada a la derecha.
 - El icono mantiene el **fondo crema del original** en vez de recolorearlo al grafito de la interfaz, porque sobre grafito el pingüino y el yunque (negros) desaparecerían.
+- La cabeza se recorta a 460 px de lado y se compone al 88 % del tile: con recortes más ajustados la cabeza toca el borde y parece cortada.
 
 ## Cambiar la marca
 
 1. Sustituye `docs/diseno/marca-ilustracion.png` por la nueva ilustración (fondo plano y claro).
-2. Si cambia el encuadre, ajusta `HEAD_BOX` en `tools/make_icons.py`.
+2. Si cambia el encuadre, ajusta el lado y el sesgo en `head_box()` de `tools/make_icons.py`.
 3. `python tools/make_icons.py` regenera iconos, favicon y marca de cabecera.
 
 > macOS necesitaría además un `.icns`, que hoy no se genera porque no hay destino macOS en la matriz de release.

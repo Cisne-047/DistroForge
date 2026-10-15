@@ -20,7 +20,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 
 ### Cambiado
 
-- **Identidad definitiva**: el logotipo es la ilustración original de Tux forjando en el yunque, de la que se derivan todos los recursos (icono de la app, favicon, apple-touch-icon y marca de la cabecera, recortada a la cabeza porque a 26 px la escena es ilegible) con `tools/make_icons.py`. Se añade la licencia MIT con la marca excluida.
+- **Identidad**: el logotipo es la ilustración original de Tux forjando en el yunque. La **marca** es la cabeza de Tux centrada en la cara —recortada automáticamente por `tools/make_icons.py`, sin coordenadas a mano— y de ella salen el icono de la app, el favicon, el apple-touch-icon y la marca de la cabecera; la escena completa queda como mascota. Se añade la licencia MIT con la marca excluida.
 - **Rediseño completo de la interfaz**: sistema *Grafito & Verde*, variante oscura. Una sola familia tipográfica, un único acento, filetes de 1 px, cifras tabulares, controles propios y cero degradados. Sustituye el tema azul marino con degradados violeta→teal y cristal.
 - **Copy de los seis pasos**: títulos coherentes con las pestañas, entradillas que explican qué se decide y qué se deduce solo, y avisos que dicen el porqué y qué hacer. `Branding` pasa a `Identidad` y el `Modo advanced` a `Modo avanzado`.
 - **Versiones alineadas** en 0.5.0: `forge-core`, `forge-cli`, `forge-wasm`, `web-ui` y `server-rs` estaban en 0.1.0 mientras el proyecto iba por la 0.4.0.
