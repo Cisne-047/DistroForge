@@ -42,6 +42,10 @@
   </head>
   <body>
     <noscript>Esta app necesita JavaScript (WASM) activado.</noscript>
-    <script type="module" src="src/main.rs"></script>
+    <!-- Declaración canónica de Trunk: compila el crate e inyecta el cargador del
+         wasm. Antes había aquí un <script src="src/main.rs"> (forma de
+         desarrollo) que Trunk no reemplazaba: se quedaba en el HTML y provocaba
+         un 404 en cada carga de la página. -->
+    <link data-trunk rel="rust" />
   </body>
 </html>
