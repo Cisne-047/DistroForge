@@ -3,8 +3,10 @@
 //! Expone el núcleo (`forge-core`) a un frontend web mediante dos comandos:
 //! `generate_project(cfg_json) -> {"ruta": "contenido"}` y
 //! `validate(cfg_json) -> [mensajes]`. El frontend es la UI Leptos/WASM, que se
-//! sirve desde `frontendDist` (`../../web-ui/dist`, generado por
-//! `trunk build --release`); ver `beforeBuildCommand` en `tauri.conf.json`.
+//! sirve desde `frontendDist` (`../../web-ui/dist`): compílala antes con
+//! `cd rust/web-ui && trunk build --release`. Los hooks de Tauri corren desde
+//! `rust/tauri-app` (no desde `src-tauri`), así que una ruta relativa ahí no
+//! resolvería; por eso el workflow de release lo hace en su propio paso.
 //! Los comandos quedan como punto de extensión nativo: la UI actual genera el
 //! proyecto en WASM y no los invoca.
 //!

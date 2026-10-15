@@ -33,8 +33,10 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
+          # rpm: el empaquetador de .rpm invoca rpmbuild; patchelf lo usa el
+          # bundler para reescribir los binarios antes de empaquetar.
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm
 
       - name: Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,10 +52,24 @@ jobs:
         with:
           workspaces: rust/tauri-app/src-tauri
 
+      - name: Cache de la CLI de Tauri
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri
+            ~/.cargo/bin/cargo-tauri.exe
+          key: tauri-cli-${{ runner.os }}-v2
+
       - name: Instalar Tauri CLI
         run: cargo install tauri-cli --version '^2' --locked
 
-      # beforeBuildCommand de tauri.conf.json compila la UI Leptos con Trunk.
+      # La UI se compila aquí y no en `beforeBuildCommand`: los hooks de Tauri
+      # se ejecutan desde la raíz del proyecto (rust/tauri-app), no desde
+      # src-tauri, así que una ruta relativa `../../web-ui` no resuelve.
+      - name: UI (Trunk)
+        working-directory: rust/web-ui
+        run: trunk build --release
+
       - name: Empaquetar
         working-directory: rust/tauri-app/src-tauri
         run: cargo tauri build --bundles ${{ matrix.bundles }}

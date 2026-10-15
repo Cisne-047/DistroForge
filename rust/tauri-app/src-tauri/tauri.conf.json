@@ -5,9 +5,7 @@
   "identifier": "com.distroforge.desktop",
   "build": {
     "frontendDist": "../../web-ui/dist",
-    "devUrl": "http://127.0.0.1:8080",
-    "beforeDevCommand": "cd ../../web-ui && trunk serve",
-    "beforeBuildCommand": "cd ../../web-ui && trunk build --release"
+    "devUrl": "http://127.0.0.1:8080"
   },
   "app": {
     "windows": [
