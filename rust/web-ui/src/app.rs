@@ -74,7 +74,27 @@ pub fn App() -> impl IntoView {
     view! {
         <div class="app">
             <header>
-                <span class="brand">"DistroForge"</span>
+                <span class="brand">
+                    <svg class="mark" viewBox="0 0 120 120" aria-hidden="true">
+                        <polygon points="60,6 107,33 107,87 60,114 13,87 13,33" fill="var(--accent)" />
+                        <polygon
+                            points="60,27 89,44 89,76 60,93 31,76 31,44"
+                            fill="none"
+                            stroke="var(--on-accent)"
+                            stroke-opacity=".5"
+                            stroke-width="7"
+                        />
+                        <rect
+                            x="40"
+                            y="55"
+                            width="42"
+                            height="10"
+                            fill="var(--on-accent)"
+                            transform="rotate(-34 60 60)"
+                        />
+                    </svg>
+                    "DistroForge"
+                </span>
                 <input
                     class="name-input"
                     spellcheck="false"
