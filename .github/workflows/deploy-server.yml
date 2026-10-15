@@ -1,0 +1,56 @@
+name: deploy-server
+
+# Despliega el backend en Fly.io si el repositorio tiene el secreto
+# FLY_API_TOKEN. Sin ese secreto el workflow no hace nada: no falla ni avisa,
+# simplemente informa de qué falta. Así el despliegue no depende de que nadie
+# tenga que pasar credenciales por el chat.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fly:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+    steps:
+      - name: Sin FLY_API_TOKEN no hay nada que hacer
+        if: env.FLY_API_TOKEN == ''
+        run: |
+          echo "::notice::No hay secreto FLY_API_TOKEN; se omite el despliegue."
+          echo "Para activarlo: crea la app (fly launch), el volumen (fly volumes create df_data --size 1)"
+          echo "y guarda el token en Settings → Secrets and variables → Actions como FLY_API_TOKEN."
+          echo "Guía completa: docs/DESPLIEGUE.md"
+
+      - name: Checkout
+        if: env.FLY_API_TOKEN != ''
+        uses: actions/checkout@v4
+
+      - name: flyctl
+        if: env.FLY_API_TOKEN != ''
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Desplegar
+        if: env.FLY_API_TOKEN != ''
+        working-directory: rust/server-rs
+        run: flyctl deploy --remote-only
+
+      - name: Comprobar que responde
+        if: env.FLY_API_TOKEN != ''
+        run: |
+          APP=$(grep -m1 '^app' rust/server-rs/fly.toml | cut -d'"' -f2)
+          echo "app: $APP"
+          for i in $(seq 1 20); do
+            if curl -fsS "https://$APP.fly.dev/api/health"; then
+              echo; echo "backend en pie"; exit 0
+            fi
+            sleep 6
+          done
+          echo "::error::el backend no responde en /api/health"
+          exit 1
