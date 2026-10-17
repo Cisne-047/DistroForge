@@ -52,6 +52,47 @@
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
 }
 
+/* Modo claro: el mismo sistema, otros valores. Los componentes no cambian porque
+   todos leen de los tokens. Lo que sigue oscuro a propósito es lo que simula una
+   pantalla (vista previa del escritorio, GRUB y el visor de ficheros). */
+:root[data-tema="claro"] {
+  --bg: #f6f8f7;
+  --surface: #ffffff;
+  --surface-2: #f1f4f2;
+  --surface-3: #e7ebe8;
+
+  --line: #e2e7e3;
+  --line-2: #cbd3cc;
+  --line-3: #b4beb6;
+
+  --ink: #121a15;
+  --ink-2: #57635c;
+  --ink-3: #86908a;
+
+  --accent: #1f7a4c;
+  --accent-2: #17603a;
+  --accent-soft: #e8f3ec;
+  --accent-ink: #12522f;
+  --on-accent: #ffffff;
+
+  --warn: #7e6417;
+  --warn-line: #d8c48a;
+  --warn-soft: #faf4e4;
+  --bad: #b3402f;
+
+  --shadow: 0 1px 2px rgba(18, 32, 24, .06), 0 14px 28px -24px rgba(18, 32, 24, .35);
+  color-scheme: light;
+}
+
+:root[data-tema="claro"] header,
+:root[data-tema="claro"] nav {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+:root[data-tema="claro"] pre.file { background: #101412; color: #c9d2cb; }
+:root[data-tema="claro"] .grub-mock { background: #0b0e0c; }
+:root[data-tema="claro"] ::-webkit-scrollbar-thumb { background: var(--line-3); }
+
 * { box-sizing: border-box; }
 
 html { color-scheme: dark; scrollbar-color: var(--line-3) transparent; }

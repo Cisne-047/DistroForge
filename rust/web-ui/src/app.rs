@@ -13,6 +13,9 @@ use crate::steps::{base::BaseStep, branding::BrandingStep, output::OutputStep,
     packages::PackagesStep, repos::ReposStep, system::SystemStep};
 use crate::util;
 
+/// Clave de localStorage donde se recuerda el tema elegido.
+const TEMA_KEY: &str = "distroforge-tema";
+
 const STEPS: [(&str, &str); 6] = [
     ("base", "1 · Base"),
     ("system", "2 · Sistema"),
@@ -53,6 +56,17 @@ pub fn App() -> impl IntoView {
     let cfg = RwSignal::new(load_config());
     let projects: RwSignal<BTreeMap<String, DistroConfig>> = RwSignal::new(load_projects());
     let step = RwSignal::new(initial_step());
+
+    // Tema claro/oscuro. El atributo lo pone antes de pintar un script en
+    // index.html (para no ver un destello); aquí se recuerda la elección y se
+    // aplica al vuelo.
+    let tema = RwSignal::new(util::ls_get(TEMA_KEY).unwrap_or_else(|| "oscuro".to_string()));
+    let aplicar_tema = move |t: &str| {
+        util::ls_set(TEMA_KEY, t);
+        if let Some(html) = util::window().document().and_then(|d| d.document_element()) {
+            let _ = html.set_attribute("data-tema", t);
+        }
+    };
 
     // Autoguardado en localStorage (sin espacio/modo privado: la app sigue).
     Effect::new(move |_| {
@@ -114,6 +128,37 @@ pub fn App() -> impl IntoView {
                             .collect_view()
                     }}
                 </select>
+                <button
+                    class="btn ghost small"
+                    aria-label="Cambiar entre tema claro y oscuro"
+                    title=move || {
+                        if tema.get() == "claro" { "Pasar a oscuro" } else { "Pasar a claro" }
+                    }
+                    on:click=move |_| {
+                        let nuevo = if tema.get() == "claro" { "oscuro" } else { "claro" };
+                        tema.set(nuevo.to_string());
+                        aplicar_tema(nuevo);
+                    }
+                >
+                    {move || {
+                        if tema.get() == "claro" {
+                            view! {
+                                <svg class="ic sm" viewBox="0 0 24 24">
+                                    <path d="M20.2 14.8A8.6 8.6 0 0 1 9.2 3.8a8.6 8.6 0 1 0 11 11Z" />
+                                </svg>
+                            }
+                                .into_any()
+                        } else {
+                            view! {
+                                <svg class="ic sm" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="4.2" />
+                                    <path d="M12 2.6v2.6M12 18.8v2.6M2.6 12h2.6M18.8 12h2.6M5.4 5.4l1.9 1.9M16.7 16.7l1.9 1.9M18.6 5.4l-1.9 1.9M7.3 16.7l-1.9 1.9" />
+                                </svg>
+                            }
+                                .into_any()
+                        }
+                    }}
+                </button>
                 <button
                     class="btn small"
                     title="Guarda esta config por su nombre"

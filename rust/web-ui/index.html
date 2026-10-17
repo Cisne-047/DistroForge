@@ -24,6 +24,26 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="fflate.js"></script>
     <script>
+      // Tema antes de pintar: evita el destello al cargar en modo oscuro.
+      // `?tema=claro|oscuro` lo fija desde el enlace (útil para compartir y para
+      // comprobarlo en pruebas).
+      (function () {
+        var t;
+        try {
+          var q = new URLSearchParams(location.search).get("tema");
+          if (q === "claro" || q === "oscuro") {
+            localStorage.setItem("distroforge-tema", q);
+            t = q;
+          } else {
+            t = localStorage.getItem("distroforge-tema") || "oscuro";
+          }
+        } catch (e) {
+          t = "oscuro";
+        }
+        document.documentElement.setAttribute("data-tema", t);
+      })();
+    </script>
+    <script>
       // Genera y descarga el ZIP del proyecto con fflate.
       // Llamado desde Rust (util::download_zip) via wasm-bindgen interop.
       window.distroforgeDownloadZip = function (name, filesJson) {
