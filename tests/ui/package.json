@@ -1,0 +1,11 @@
+{
+  "name": "distroforge-ui-tests",
+  "private": true,
+  "description": "Pruebas de interfaz de DistroForge: cargan la app construida de verdad (WASM incluido) en un navegador y comprueban lo que un usuario ve y pulsa.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

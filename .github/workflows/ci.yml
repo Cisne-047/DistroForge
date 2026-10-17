@@ -106,3 +106,45 @@ jobs:
           npm install
           npm test
         working-directory: legacy/server-node
+
+  # Pruebas de interfaz con navegador real: cargan la app construida (WASM
+  # incluido) y comprueban lo que un usuario ve y pulsa. Hasta ahora la UI solo se
+  # compilaba, así que un fallo como la ventana en blanco no lo detectaba nada.
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Target wasm32
+        run: rustup target add wasm32-unknown-unknown
+      - name: Trunk
+        uses: jetli/trunk-action@v0.5.0
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/web-ui
+      - name: Interfaz servida en la raíz (como en la imagen y el túnel)
+        working-directory: rust/web-ui
+        run: trunk build --release --public-url /
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Playwright
+        working-directory: tests/ui
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Pruebas de interfaz
+        working-directory: tests/ui
+        env:
+          UI_DIST: ${{ github.workspace }}/rust/web-ui/dist
+          UI_PORT: "4173"
+        run: npx playwright test
+      - name: Capturas y trazas si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: tests/ui/test-results
+          if-no-files-found: ignore
