@@ -107,8 +107,11 @@ jobs:
             'tr -d "\r\n " | base64 -d > /tmp/src.tgz && mkdir -p ~/df && tar xzf /tmp/src.tgz -C ~/df'
           # `instabox exec` corta a los 60 s por defecto y compilar la imagen
           # tarda más, así que se lanza en segundo plano y se sondea un centinela
-          # con el código de salida.
-          instabox exec "$SB" -- 'cd ~/df && rm -f /tmp/build.log /tmp/build.exit && nohup sh -c "docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke . > /tmp/build.log 2>&1; echo \$? > /tmp/build.exit" >/dev/null 2>&1 & echo lanzado'
+          # con el código de salida. `setsid` + `</dev/null` son imprescindibles:
+          # sin ellos el proceso hereda la entrada del exec, la sesión no se cierra
+          # y el CLI mata el comando a los 60 s. Es exactamente lo que hacía fallar
+          # esta prueba (run 39031472415) aunque la construcción siguiera luego.
+          instabox exec "$SB" -- 'cd ~/df && rm -f /tmp/build.log /tmp/build.exit && setsid sh -c "docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke . > /tmp/build.log 2>&1; echo \$? > /tmp/build.exit" </dev/null >/dev/null 2>&1 & echo lanzado'
           for i in $(seq 1 60); do
             sleep 20
             code=$(instabox exec "$SB" -- 'cat /tmp/build.exit 2>/dev/null' 2>/dev/null | tr -d '[:space:]')
