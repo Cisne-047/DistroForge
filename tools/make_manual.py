@@ -135,9 +135,8 @@ def build():
     # ------------------------------------------------------------------ 2
     h(doc, "2. Arquitectura", 1)
     doc.add_paragraph(
-        "Todo el código es Rust desde la v0.4.0. La app React/TypeScript original y el backend Node "
-        "siguen en legacy/ como referencia y como suite de paridad: el núcleo Rust genera exactamente "
-        "los mismos ficheros que generaba el núcleo TypeScript."
+        "Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador, el "
+        "CLI, el backend (axum) y la app de escritorio (Tauri 2)."
     )
     table(
         doc,
@@ -149,7 +148,6 @@ def build():
             ["web-ui", "Leptos 0.7 CSR + Trunk", "La app: seis pasos, vista previa, galería y sección Servidor."],
             ["server-rs", "axum + rusqlite", "Cuentas, galería con FTS5 y Test Drive VNC."],
             ["tauri-app", "Tauri 2", "App de escritorio que sirve el bundle de la UI."],
-            ["legacy", "React/TS + Node", "Referencia y paridad (74 + 8 tests)."],
         ],
         widths=[Pt(90), Pt(120), Pt(280)],
     )
@@ -269,7 +267,7 @@ cd rust/web-ui && trunk serve                      # desarrollo (Tauri apunta a 
     # ------------------------------------------------------------------ 7
     h(doc, "7. Backend", 1)
     doc.add_paragraph(
-        "server-rs replica el backend Node en axum. Es opcional: sin él la app funciona entera salvo "
+        "server-rs es el backend, en axum. Es opcional: sin él la app funciona entera salvo "
         "las funciones de comunidad."
     )
     table(
@@ -299,7 +297,7 @@ cd rust/web-ui && trunk serve                      # desarrollo (Tauri apunta a 
         doc,
         ["Workflow", "Cuándo", "Qué valida"],
         [
-            ["ci.yml", "push y PR", "Núcleo con clippy, backend con tests, UI WASM con Trunk + wasm-opt y la suite legacy"],
+            ["ci.yml", "push y PR", "Núcleo con clippy, backend con tests, UI WASM con Trunk + wasm-opt y la interfaz en un navegador real"],
             ["deploy.yml", "push a main", "Build de la UI y publicación en GitHub Pages"],
             ["release.yml", "tags v* o manual", "Empaquetado de escritorio en Linux y Windows; Release con tag"],
             ["server-image.yml", "main, tags o manual", "Imagen del backend publicada en GHCR"],
@@ -315,18 +313,17 @@ cd rust/web-ui && trunk serve                      # desarrollo (Tauri apunta a 
     code(
         doc,
         """
-cd rust && cargo test -p forge-core          # núcleo + paridad
+cd rust && cargo test -p forge-core          # núcleo
 cd rust/server-rs && cargo test              # backend (8 tests de integración)
 cd rust/web-ui && trunk serve                # UI con recarga
-cd legacy && npm ci && npm test              # referencia TypeScript
 python tools/make_icons.py                   # iconos de app y favicon
 python tools/make_manual.py                  # este manual
         """,
     )
     doc.add_paragraph(
         "Para añadir una base nueva: entra en el catálogo del núcleo (forge-core), añade la familia "
-        "con su gestor de paquetes, su motor y sus valores por defecto, y cubre el caso en los tests "
-        "de paridad. La UI y el CLI la recogen automáticamente porque ambos leen el mismo catálogo."
+        "con su gestor de paquetes, su motor y sus valores por defecto, y cubre el caso en los tests. "
+        "La UI y el CLI la recogen automáticamente porque ambos leen el mismo catálogo."
     )
 
     # ------------------------------------------------------------------ 10

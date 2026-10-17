@@ -9,7 +9,7 @@ Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paq
 
 **Estado: 1.0.0.** Todo lo que promete este README está hecho y comprobado en CI, incluida una ISO real que se hornea y arranca en cada release. Las limitaciones conocidas (firma de sistema, macOS y el host del backend) están al final, en el roadmap.
 
-Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI, el backend con Test Drive VNC (`axum`) y la app de escritorio (Tauri 2). La app React/TS original y el backend Node viven en `legacy/` como referencia y suite de paridad.
+Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI, el backend con Test Drive VNC (`axum`) y la app de escritorio (Tauri 2).
 
 ## Qué genera
 
@@ -23,15 +23,14 @@ Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo gen
 
 ```
 rust/
-  crates/forge-core   núcleo generador (~80 tests, paridad byte a byte con legacy)
+  crates/forge-core   núcleo generador (~80 tests)
   crates/forge-cli    CLI: forge dump <base> <dir> [salida] [config.json]
   crates/forge-wasm   bindings del core para la web
-  rust/web-ui         la app web: Leptos 0.7 CSR + Trunk → dist/ para Pages
-  rust/server-rs      backend axum: cuentas, galería FTS5, Test Drive VNC (QEMU+noVNC)
-  rust/tauri-app      app de escritorio (Tauri 2) que sirve el bundle de web-ui
-legacy/               app React/TS + backend Node (referencia; suite de paridad)
+  web-ui              la app web: Leptos 0.7 CSR + Trunk → dist/ para Pages
+  server-rs           backend axum: cuentas, galería FTS5, Test Drive VNC (QEMU+noVNC)
+  tauri-app           app de escritorio (Tauri 2) que sirve el bundle de web-ui
 gallery/              packs comunitarios; la UI los empaqueta en el build
-tools/                scripts de mantenimiento (generación de iconos)
+tools/                scripts de mantenimiento (generación de iconos y del manual)
 docs/                 manual técnico (DOCX + PDF), guía de despliegue y diseño
 project/              ejemplo de proyecto generado
 ```
@@ -60,7 +59,7 @@ El binario no necesita conexión: la galería viaja en el bundle y el ZIP se gen
 
 ## Backend (cuentas, galería y Test Drive)
 
-`rust/server-rs` replica el backend Node de `legacy/` en axum: cuentas con scrypt, galería con FTS5 y Test Drive VNC (QEMU + noVNC).
+`rust/server-rs` es el backend en axum: cuentas con scrypt, galería con FTS5 y Test Drive VNC (QEMU + noVNC).
 
 ```bash
 cd rust/server-rs && cargo run --release     # 0.0.0.0:8080
@@ -84,12 +83,9 @@ cd rust/server-rs && cargo test && cargo run --release
 
 # escritorio
 cd rust/tauri-app/src-tauri && cargo tauri dev
-
-# legacy (referencia)
-cd legacy && npm ci && npm test
 ```
 
-El CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) compila y prueba en cada push y PR: núcleo Rust con clippy, backend, UI WASM con `trunk build` + `wasm-opt` y la suite legacy. El deploy a Pages solo corre en `main`.
+El CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) compila y prueba en cada push y PR: núcleo Rust con clippy, backend, UI WASM con `trunk build` + `wasm-opt` y la interfaz en un navegador real. El deploy a Pages solo corre en `main`.
 
 Hay además dos workflows que no se conforman con compilar:
 

@@ -2,14 +2,21 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su etiqueta, con los paquetes firmados y la ISO construida y arrancada en CI.
 
+## [Sin publicar]
+
+### Cambiado
+
+- **Solo queda Rust**: se elimina el código heredado (la app React/TS y el backend
+  Node) y su job de CI. El repositorio contiene únicamente la implementación
+  actual: núcleo, CLI, UI Leptos/WASM, backend axum y app de escritorio Tauri.
+
 ## [1.0.0] - 2026-10-17
 
 Primera versión estable. Lo que la hace 1.0 no es una función nueva, sino que todo
 lo que promete el README está hecho **y comprobado**:
 
 - La app web y la de escritorio generan proyectos para 14 bases y 4 motores, con 8
-  formatos de salida. El núcleo pasa 80 tests y la suite de paridad con la app
-  React original sigue en verde.
+  formatos de salida. El núcleo pasa 80 tests.
 - **Una ISO real se hornea y arranca en CI** en cada release: estructura (El
   Torito), contenido (lo configurado dentro del squashfs) y arranque en QEMU, con
   la ISO como artefacto descargable.

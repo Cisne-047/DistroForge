@@ -83,33 +83,6 @@ jobs:
           mv "$WASM.opt" "$WASM"
           ls -la dist/
 
-  legacy:
-    # app React/TS original + backend Node: referencia y suite de paridad
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: legacy/package-lock.json
-      - name: Tests de la app legacy
-        run: |
-          npm ci
-          npm test
-        working-directory: legacy
-      - name: Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Tests del backend legacy
-        run: |
-          npm install
-          npm test
-        working-directory: legacy/server-node
-
   # Pruebas de interfaz con navegador real: cargan la app construida (WASM
   # incluido) y comprueban lo que un usuario ve y pulsa. Hasta ahora la UI solo se
   # compilaba, así que un fallo como la ventana en blanco no lo detectaba nada.
