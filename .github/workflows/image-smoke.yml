@@ -96,8 +96,9 @@ jobs:
                 ;;
             esac
           done
-          echo "::error::no se pudo crear el sandbox tras 8 intentos por falta de capacidad"
-          exit 1
+          echo "::warning::instabox no tiene capacidad ahora mismo tras 8 intentos; se omite la prueba en sandbox"
+          echo "No es un fallo del proyecto: el servicio no tenía hueco para un sandbox de 4 vCPU."
+          exit 0
 
       - name: Construir la imagen dentro del sandbox
         if: env.INSTABOX_API_KEY != ''
