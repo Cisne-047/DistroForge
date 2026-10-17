@@ -105,7 +105,25 @@ jobs:
           tar czf /tmp/src.tgz rust/server-rs rust/web-ui/dist .dockerignore
           base64 -w0 /tmp/src.tgz | instabox exec "$SB" --stdin -- \
             'tr -d "\r\n " | base64 -d > /tmp/src.tgz && mkdir -p ~/df && tar xzf /tmp/src.tgz -C ~/df'
-          instabox exec "$SB" -- 'cd ~/df && docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke .'
+          # `instabox exec` corta a los 60 s por defecto y compilar la imagen
+          # tarda más, así que se lanza en segundo plano y se sondea un centinela
+          # con el código de salida.
+          instabox exec "$SB" -- 'cd ~/df && rm -f /tmp/build.log /tmp/build.exit && nohup sh -c "docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke . > /tmp/build.log 2>&1; echo \$? > /tmp/build.exit" >/dev/null 2>&1 & echo lanzado'
+          for i in $(seq 1 40); do
+            sleep 15
+            code=$(instabox exec "$SB" -- 'cat /tmp/build.exit 2>/dev/null' 2>/dev/null | tr -d '[:space:]')
+            if [ -n "$code" ]; then
+              echo "construccion terminada con codigo $code"
+              break
+            fi
+            echo "  ... $(instabox exec "$SB" -- 'tail -1 /tmp/build.log' 2>/dev/null || echo 'sin salida')"
+          done
+          if [ "${code:-}" != "0" ]; then
+            echo "::error::la construccion fallo"
+            instabox exec "$SB" -- 'tail -40 /tmp/build.log'
+            exit 1
+          fi
+          instabox exec "$SB" -- 'docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | head -3'
 
       - name: Ejecutar y comprobar de verdad
         if: env.INSTABOX_API_KEY != ''
