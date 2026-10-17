@@ -32,8 +32,12 @@ jobs:
         with:
           workspaces: rust/web-ui
       - name: Build de la UI Rust
-        run: trunk build --release
         working-directory: rust/web-ui
+        # URL del backend por defecto, tomada de una variable del repositorio
+        # (Settings → Variables). Si está vacía, la app usa su propio origen.
+        env:
+          DISTROFORGE_SERVER_URL: ${{ vars.DISTROFORGE_SERVER_URL }}
+        run: trunk build --release
       - name: wasm-opt (binaryen)
         run: |
           curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz

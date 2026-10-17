@@ -31,8 +31,26 @@ pub struct Rating {
     pub n: i64,
 }
 
+/// URL del backend, por orden de prioridad:
+///
+/// 1. la que haya configurado el usuario (localStorage),
+/// 2. la que se hornea al compilar (`DISTROFORGE_SERVER_URL`, que el deploy de
+///    Pages toma de una variable del repositorio),
+/// 3. el propio origen: si el backend sirve la interfaz (imagen de Docker,
+///    túnel, sandbox), la API está ahí mismo y no hay nada que configurar.
 pub fn server_url() -> String {
-    ls_get(URL_KEY).unwrap_or_default()
+    let stored = ls_get(URL_KEY).unwrap_or_default();
+    if !stored.trim().is_empty() {
+        return stored;
+    }
+    let baked = option_env!("DISTROFORGE_SERVER_URL").unwrap_or("").trim();
+    if !baked.is_empty() {
+        return baked.trim_end_matches('/').to_string();
+    }
+    crate::util::window()
+        .location()
+        .origin()
+        .unwrap_or_default()
 }
 
 pub fn set_server_url(url: &str) {

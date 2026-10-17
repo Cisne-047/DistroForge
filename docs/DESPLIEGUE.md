@@ -88,6 +88,19 @@ ejecutar en `debian:bookworm-slim` (2.36) dejaba al binario pidiendo símbolos
 inexistentes. El sandbox también trae QEMU, así que `testdrive/available` responde
 `true` y el Test Drive se puede probar de verdad.
 
+## URL por defecto en la app
+
+Que nadie tenga que escribir la URL a mano: el deploy de Pages hornea la del
+backend con la **variable del repositorio** `DISTROFORGE_SERVER_URL`
+(Settings → Variables → Actions), que se pasa al compilar la interfaz.
+
+El orden de prioridad al resolver el servidor es:
+
+1. lo que haya configurado el usuario en la sección *Servidor* (localStorage),
+2. la URL horneada en el build,
+3. el propio origen, para cuando el backend sirve la interfaz (imagen de Docker,
+   túnel o sandbox): ahí la API está en la misma URL y no hay nada que configurar.
+
 ## Variables de entorno
 
 | Variable | Por defecto | Para qué |
