@@ -1,0 +1,172 @@
+name: redeploy-sandbox
+
+# Recrea el contenedor del backend en un sandbox de instabox con la imagen ya
+# publicada en GHCR, conservando su configuración (volúmenes, variables, puerto
+# y política de reinicio) y con vuelta atrás a la imagen anterior si la nueva no
+# responde.
+#
+# Se lanza a mano (workflow_dispatch) porque toca un host persistente. Necesita
+# el secreto INSTABOX_API_KEY (el mismo que usa image-smoke.yml) y permiso de
+# lectura de paquetes para descargar la imagen.
+
+on:
+  workflow_dispatch:
+    inputs:
+      machine:
+        description: "Sandbox de instabox"
+        required: true
+        default: "distroforge-docker"
+      image:
+        description: "Imagen a desplegar"
+        required: true
+        default: "ghcr.io/cisne-047/distroforge-server:latest"
+      container:
+        description: "Contenedor a recrear"
+        required: true
+        default: "df"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: redeploy-sandbox
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_INSTABOX: ${{ secrets.INSTABOX_API_KEY != '' }}
+    steps:
+      - name: Sin INSTABOX_API_KEY no hay nada que hacer
+        if: env.HAS_INSTABOX == 'false'
+        run: |
+          echo "::error::falta el secreto INSTABOX_API_KEY"
+          exit 1
+
+      - name: CLI de instabox
+        if: env.HAS_INSTABOX == 'true'
+        run: |
+          curl -fsSL https://instabox.sh/install.sh | env INSTABOX_INSTALL_DIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          mkdir -p "$HOME/.config/instabox"
+          instabox --version
+
+      - name: Validar entradas y preparar el script remoto
+        if: env.HAS_INSTABOX == 'true'
+        env:
+          SB: ${{ inputs.machine }}
+          IMAGE: ${{ inputs.image }}
+          CNAME: ${{ inputs.container }}
+        run: |
+          set -euo pipefail
+          case "$SB" in (*[!a-z0-9_-]*|"") echo "::error::machine inválida"; exit 1;; esac
+          case "$CNAME" in (*[!a-z0-9_-]*|"") echo "::error::container inválido"; exit 1;; esac
+          case "$IMAGE" in
+            ghcr.io/*:*) ;;
+            *) echo "::error::la imagen debe ser ghcr.io/<owner>/<repo>:<tag>"; exit 1;;
+          esac
+          case "$IMAGE" in (*[!A-Za-z0-9._/:@-]*) echo "::error::imagen con caracteres raros"; exit 1;; esac
+
+          cat > /tmp/remote.sh <<'EOS'
+          set -euo pipefail
+
+          : "${IMAGE:?}"; : "${CNAME:?}"; : "${GHCR_USER:?}"; : "${GHCR_TOKEN:?}"
+
+          echo "== contenedor actual: $CNAME =="
+          docker inspect "$CNAME" --format 'imagen={{.Config.Image}} estado={{.State.Status}} reinicio={{.HostConfig.RestartPolicy.Name}}'
+          docker inspect "$CNAME" --format '{{range .Mounts}}montaje={{.Type}} {{if eq .Type "volume"}}{{.Name}}{{else}}{{.Source}}{{end}} -> {{.Destination}}{{println}}{{end}}' || true
+
+          OLD_IMAGE=$(docker inspect "$CNAME" --format '{{.Config.Image}}')
+          mapfile -t MOUNTS < <(docker inspect "$CNAME" --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}}{{println}}{{end}}')
+          mapfile -t ENVS < <(docker inspect "$CNAME" --format '{{range .Config.Env}}{{println .}}{{end}}')
+          RESTART=$(docker inspect "$CNAME" --format '{{.HostConfig.RestartPolicy.Name}}')
+          HOSTPORT=$(docker inspect "$CNAME" --format '{{(index (index .HostConfig.PortBindings "8080/tcp") 0).HostPort}}' 2>/dev/null || true)
+          HOSTPORT=${HOSTPORT:-8080}
+
+          ARGS=()
+          HAS_DATA=0
+          for m in "${MOUNTS[@]}"; do
+            [ -n "$m" ] || continue
+            ARGS+=(-v "$m")
+            case "$m" in *":/data") HAS_DATA=1;; esac
+          done
+          for e in "${ENVS[@]}"; do
+            [ -n "$e" ] || continue
+            case "${e%%=*}" in PATH|HOSTNAME|HOME) continue;; esac
+            ARGS+=(-e "$e")
+          done
+          [ -n "$RESTART" ] && [ "$RESTART" != "no" ] && ARGS+=(--restart "$RESTART")
+          echo "puerto publicado: $HOSTPORT -> 8080; argumentos reutilizados: ${#ARGS[@]}"
+
+          echo "== iniciar sesión en GHCR y descargar =="
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
+          docker pull "$IMAGE"
+
+          if [ "$HAS_DATA" = 0 ]; then
+            echo "== /data no está montado: se pasa a un volumen para no perder cuentas y packs =="
+            rm -rf /tmp/dfdata; mkdir -p /tmp/dfdata
+            docker cp "$CNAME":/data/. /tmp/dfdata/ 2>/dev/null || true
+            docker volume create df-data >/dev/null
+            docker run --rm -v df-data:/data -v /tmp/dfdata:/from:ro --entrypoint sh debian:bookworm-slim \
+              -c 'cp -a /from/. /data/ 2>/dev/null || true'
+            ARGS+=(-v df-data:/data)
+          fi
+
+          start() { # start <nombre> <puerto-host> <imagen>
+            docker rm -f "$1" >/dev/null 2>&1 || true
+            docker run -d --name "$1" "${ARGS[@]}" -p "$2:8080" "$3" >/dev/null
+          }
+          esperar() { # esperar <puerto>
+            for _ in $(seq 1 40); do
+              curl -fsS -m 2 "http://127.0.0.1:$1/api/health" >/dev/null 2>&1 && return 0
+              sleep 1
+            done
+            return 1
+          }
+
+          echo "== prueba con la misma configuración en el puerto 8081 =="
+          start "${CNAME}-next" 8081 "$IMAGE"
+          if ! esperar 8081; then
+            echo "::error::la imagen nueva no responde en la prueba"
+            docker logs --tail 40 "${CNAME}-next" || true
+            docker rm -f "${CNAME}-next" >/dev/null 2>&1 || true
+            exit 1
+          fi
+          docker exec "${CNAME}-next" sh -c 'grep -rqs "SteamOS" /app/web && echo "interfaz nueva: OK"'
+          docker exec "${CNAME}-next" sh -c 'curl -fsS http://127.0.0.1:8080/api/gallery >/dev/null && echo "base de datos: OK"'
+          docker rm -f "${CNAME}-next" >/dev/null
+
+          echo "== sustituir $CNAME (vuelta atrás disponible: $OLD_IMAGE) =="
+          docker rm -f "$CNAME" >/dev/null
+          start "$CNAME" "$HOSTPORT" "$IMAGE"
+          if ! esperar "$HOSTPORT"; then
+            echo "::error::la imagen nueva no arranca en el puerto definitivo; vuelvo a la anterior"
+            docker logs --tail 40 "$CNAME" || true
+            start "$CNAME" "$HOSTPORT" "$OLD_IMAGE"
+            esperar "$HOSTPORT" || true
+            exit 1
+          fi
+
+          echo "== estado final =="
+          docker ps --format '{{.Names}} {{.Image}} {{.Ports}}' | sed 's/^/  /'
+          curl -fsS "http://127.0.0.1:$HOSTPORT/api/health"; echo
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          echo "listo"
+          EOS
+
+          # El token va dentro del script (no por stdin: `bash -s` también lee el
+          # script de stdin) y se evita que acabe en el historial del shell remoto.
+          {
+            printf 'export GHCR_TOKEN=%q\n' "${{ secrets.GITHUB_TOKEN }}"
+            cat /tmp/remote.sh
+          } > /tmp/run.sh
+
+          instabox exec "$SB" --stdin --timeout 600 -- \
+            "GHCR_USER='${{ github.actor }}' IMAGE='$IMAGE' CNAME='$CNAME' bash -s" < /tmp/run.sh
+
+      - name: Resumen
+        if: env.HAS_INSTABOX == 'true'
+        run: echo "desplegado ${{ inputs.image }} en ${{ inputs.machine }}/${{ inputs.container }}"
