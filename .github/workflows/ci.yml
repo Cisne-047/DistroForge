@@ -71,7 +71,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown && cargo check --target wasm32-unknown-unknown
       - name: Build release
         run: |
-          for intento in 1 2 3; do
+          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release && exit 0; sleep 10; done; exit 1
             rm -rf dist .stage
             if trunk build --release; then exit 0; fi
             echo "::warning::intento $intento de la interfaz fallido; se reintenta"
@@ -136,7 +136,7 @@ jobs:
       - name: Interfaz servida en la raíz (como en la imagen y el túnel)
         working-directory: rust/web-ui
         run: |
-          for intento in 1 2 3; do             rm -rf dist .stage             if trunk build --release --public-url /; then exit 0; fi             echo "::warning::intento $intento de la interfaz fallido; se reintenta"             sleep 10           done           echo "::error::la interfaz no se construyo tras 3 intentos"           exit 1
+          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
       - name: Node
         uses: actions/setup-node@v4
         with:

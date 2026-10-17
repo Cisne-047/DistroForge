@@ -62,7 +62,7 @@ jobs:
         if: env.INSTABOX_API_KEY != ''
         working-directory: rust/web-ui
         run: |
-          for intento in 1 2 3; do             rm -rf dist .stage             if trunk build --release --public-url /; then exit 0; fi             echo "::warning::intento $intento de la interfaz fallido; se reintenta"             sleep 10           done           echo "::error::la interfaz no se construyo tras 3 intentos"           exit 1
+          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
 
       - name: CLI de instabox
         if: env.INSTABOX_API_KEY != ''

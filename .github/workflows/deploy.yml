@@ -38,7 +38,7 @@ jobs:
         env:
           DISTROFORGE_SERVER_URL: ${{ vars.DISTROFORGE_SERVER_URL }}
         run: |
-          for intento in 1 2 3; do             rm -rf dist .stage             if trunk build --release; then exit 0; fi             echo "::warning::intento $intento de la interfaz fallido; se reintenta"             sleep 10           done           echo "::error::la interfaz no se construyo tras 3 intentos"           exit 1
+          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release && exit 0; sleep 10; done; exit 1
       - name: wasm-opt (binaryen)
         run: |
           curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz
