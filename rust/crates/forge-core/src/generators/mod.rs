@@ -638,8 +638,12 @@ pub fn workflow_yaml(cfg: &DistroConfig) -> String {
 
     if engine == EngineId::Livebuild {
         let container = base_by_id(cfg.base).container.unwrap_or("debian:bookworm");
+        // --privileged: `lb build` monta /proc y /dev/pts dentro del chroot y sin
+        // privilegios falla con "mount: permission denied". El build.sh local ya
+        // lo usaba; el workflow de CI no, así que el proyecto generado no se
+        // construía en GitHub Actions.
         return format!(
-            "{head}    container:\n      image: {container}\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n{qemu}      - name: Instalar live-build\n        run: apt-get update && apt-get install -y live-build\n      - name: Construir imagen\n        run: |\n          cd livebuild\n          chmod +x auto/* config/hooks/* || true\n          lb config\n          lb build\n{upload}",
+            "{head}    container:\n      image: {container}\n      options: --privileged\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n{qemu}      - name: Instalar live-build\n        run: apt-get update && apt-get install -y live-build\n      - name: Construir imagen\n        run: |\n          cd livebuild\n          chmod +x auto/* config/hooks/* || true\n          lb config\n          lb build\n{upload}",
             head = head,
             container = container,
             qemu = qemu_step,

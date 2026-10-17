@@ -176,7 +176,7 @@ fn bases_con_repos_preset_generan_hook_apt_con_suite() {
 #[test]
 fn merge_presets_cambia_presets_y_conserva_usuario() {
     let user_repo = repo("mio", "https://example.com/mio", "", "");
-    let tras_mint = merge_presets(base_by_id(BaseId::Mint), &[user_repo.clone()]);
+    let tras_mint = merge_presets(base_by_id(BaseId::Mint), std::slice::from_ref(&user_repo));
     assert!(tras_mint.iter().any(|r| r.alias == "linuxmint"));
     let tras_cachy = merge_presets(base_by_id(BaseId::Cachyos), &tras_mint);
     assert!(tras_cachy.iter().any(|r| r.alias == "cachyos"));
@@ -1055,8 +1055,12 @@ fn grub_timeout_y_parametros_en_los_cuatro_motores() {
     assert!(auto.contains("vt.global_cursor_default=0"));
     let hook = lb
         .get("livebuild/config/hooks/0900-grub-timeout.hook.binary")
-        .expect("falta el hook que aplica el timeout de GRUB");
+        .expect("falta el hook que aplica el timeout de arranque");
+    // GRUB usa segundos; isolinux, décimas (0 = esperar siempre, que es lo que
+    // hacía que el menú se quedara colgado).
     assert!(hook.contains("set timeout=7"));
+    assert!(hook.contains("timeout 70"));
+    assert!(hook.contains("binary/isolinux/isolinux.cfg"));
     assert!(hook.contains("binary/boot/grub/grub.cfg"));
     let ks = generate_project(&g(cfg_for(BaseId::Fedora)))
         .get("fedora/ks.cfg")
@@ -1224,7 +1228,7 @@ fn desatendida_preseed_y_bootappend_solo_debian() {
     assert!(pre.contains("time/zone string Europe/Madrid"));
     // sin unattended no hay preseed ni --debian-installer
     let off = generate_project(&cfg_for(BaseId::Debian));
-    assert!(off.get("livebuild/config/includes.installer/preseed.cfg").is_none());
+    assert!(!off.contains_key("livebuild/config/includes.installer/preseed.cfg"));
     assert!(!off
         .get("livebuild/auto/config")
         .unwrap()
@@ -1260,9 +1264,8 @@ fn smoke_yml_solo_en_iso_yaml_valido_y_cosign_en_oci() {
     let smoke = files.get(".github/workflows/smoke.yml").unwrap();
     assert!(smoke.contains("qemu-system-x86_64"));
     serde_yaml::from_str::<serde_yaml::Value>(smoke).unwrap();
-    assert!(generate_project(&cfg_for(BaseId::Debian))
-        .get(".github/workflows/smoke.yml")
-        .is_none());
+    assert!(!generate_project(&cfg_for(BaseId::Debian))
+        .contains_key(".github/workflows/smoke.yml"));
     let mut o = cfg_for(BaseId::Debian);
     o.output = OutputFormat::Oci;
     o.sign_image = true;
@@ -1325,9 +1328,8 @@ fn test_drive_capturas_solo_en_iso_yaml_valido() {
     assert!(td.contains("pnmtopng"));
     serde_yaml::from_str::<serde_yaml::Value>(td).unwrap();
     c.output = OutputFormat::Oci;
-    assert!(generate_project(&c)
-        .get(".github/workflows/testdrive.yml")
-        .is_none());
+    assert!(!generate_project(&c)
+        .contains_key(".github/workflows/testdrive.yml"));
     assert!(validate(&c).iter().any(|i| i.contains("Test Drive")));
 }
 
@@ -1357,4 +1359,22 @@ fn nube_workflows_aws_y_azure_con_disco_requerido() {
     let mut bad = cfg_for(BaseId::Debian);
     bad.cloud_upload = forge_core::types::CloudUpload::Aws;
     assert!(validate(&bad).iter().any(|i| i.contains("Nube")));
+}
+
+#[test]
+fn el_workflow_de_livebuild_corre_con_privilegios() {
+    // `lb build` monta /proc y /dev/pts dentro del chroot del live: sin
+    // --privileged falla con "mount: permission denied" y el proyecto generado no
+    // se construye. El build.sh local ya lo llevaba; el workflow de CI no.
+    let lb = generate_project(&cfg_for(BaseId::Debian));
+    let yml = lb.get(".github/workflows/build.yml").unwrap();
+    assert!(
+        yml.contains("options: --privileged"),
+        "el workflow de live-build necesita privilegios para montar el chroot"
+    );
+    assert!(yml.contains("lb build"));
+    serde_yaml::from_str::<serde_yaml::Value>(yml).unwrap();
+
+    // y el script local sigue llevándolos
+    assert!(lb.get("build.sh").unwrap().contains("--privileged"));
 }

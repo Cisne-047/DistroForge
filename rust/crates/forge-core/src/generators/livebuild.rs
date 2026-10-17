@@ -280,15 +280,19 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         services_hook,
     ));
     files.extend(net_files);
-    // live-build no acepta ninguna opción de timeout para GRUB (`--grub-timeout`
-    // no existe: `lb config` aborta con "unrecognized option" y el proyecto no se
-    // construye). Se ajusta el menú ya generado con un hook de la fase binary,
-    // que es donde live-build sí lo permite.
+    // live-build no acepta ninguna opción de timeout (`--grub-timeout` no existe:
+    // `lb config` aborta con "unrecognized option" y el proyecto no se construye).
+    // Se ajusta en la fase binary, que es donde live-build sí lo permite. En
+    // arranque BIOS manda isolinux y su `timeout` va en décimas de segundo (0 =
+    // esperar siempre); en GRUB/UEFI el menú usa `set timeout=`.
+    let arranque_timeout = js_num(cfg.grub.timeout);
+    let isolinux_timeout = format!("{}", (cfg.grub.timeout * 10.0).round() as i64);
     files.push((
         "livebuild/config/hooks/0900-grub-timeout.hook.binary".to_string(),
         format!(
-            "#!/bin/sh\nset -e\n# DistroForge - timeout del menu GRUB ({t}s)\nfor cfg in binary/boot/grub/grub.cfg binary/boot/grub/config.cfg; do\n  if [ -f \"$cfg\" ]; then\n    sed -i \"s/^set timeout=.*/set timeout={t}/\" \"$cfg\" || true\n  fi\ndone\n",
-            t = js_num(cfg.grub.timeout)
+            "#!/bin/sh\nset -e\n# DistroForge - timeout del menu de arranque ({t}s)\nfor cfg in binary/isolinux/isolinux.cfg binary/boot/grub/grub.cfg binary/boot/grub/config.cfg; do\n  if [ -f \"$cfg\" ]; then\n    sed -i \"s/^timeout .*/timeout {tt}/\" \"$cfg\" || true\n    sed -i \"s/^set timeout=.*/set timeout={t}/\" \"$cfg\" || true\n  fi\ndone\n",
+            t = arranque_timeout,
+            tt = isolinux_timeout
         ),
     ));
     if !flatpak_hook.is_empty() {

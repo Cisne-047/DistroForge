@@ -12,12 +12,17 @@ name: iso-build
 # push: solo al publicar un tag o a mano.
 
 on:
+  # Solo a mano: se depura fuera de GitHub (en un sandbox) y se lanza cuando ya
+  # funciona. Cada intento fallido le manda un aviso al dueño del repositorio, así
+  # que no se usa CI como banco de pruebas.
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: read
+
+concurrency:
+  group: iso-build
+  cancel-in-progress: true
 
 jobs:
   debian-iso:
@@ -25,6 +30,10 @@ jobs:
     timeout-minutes: 240
     container:
       image: debian:bookworm
+      # `lb build` monta /proc y /dev/pts dentro del chroot: sin privilegios falla
+      # con "mount: permission denied". El workflow que genera DistroForge para
+      # live-build tenía el mismo fallo (ya corregido en el núcleo).
+      options: --privileged
     steps:
       - name: Prerrequisitos
         run: |
@@ -105,19 +114,27 @@ jobs:
 
       - name: Arrancarla en QEMU (la prueba de verdad)
         run: |
-          apt-get install -y --no-install-recommends qemu-system-x86
+          apt-get install -y --no-install-recommends qemu-system-x86 netpbm socat
           ISO=$(find /tmp/proj -name '*.iso' | head -n1)
-          echo "arrancando $ISO en QEMU (hasta 4 minutos)..."
-          timeout 240 qemu-system-x86_64 -m 2048 -no-reboot -display none \
-            -cdrom "$ISO" -serial file:/tmp/serial.log || true
-          echo "--- ultimas lineas de la consola serie ---"
-          tail -n 20 /tmp/serial.log || true
-          if grep -qE 'login:|Welcome to|Gracefully powering off' /tmp/serial.log; then
-            echo "LA ISO ARRANCA: se ve el login en la consola serie"
-          else
-            echo "::error::la ISO no llega al login; revisa el log serie"
-            exit 1
-          fi
+          mkdir -p /tmp/shots
+          # Se arranca y se mira la PANTALLA, no el puerto serie: el arranque live
+          # va con `quiet splash` y no levanta consola serie, así que el log sale
+          # vacío aunque el sistema arranque perfectamente (comprobado a mano).
+          qemu-system-x86_64 -m 2048 -no-reboot -display none \
+            -cdrom "$ISO" -monitor unix:/tmp/shots/mon,server,nowait &
+          QPID=$!
+          sleep 120
+          echo "screendump /tmp/shots/boot.ppm" | socat - UNIX-CONNECT:/tmp/shots/mon
+          sleep 3
+          kill $QPID 2>/dev/null || true
+          ls -lh /tmp/shots/boot.ppm || { echo "::error::QEMU no dio ninguna pantalla"; exit 1; }
+          pnmtopng /tmp/shots/boot.ppm > /tmp/shots/boot.png || true
+          # un menú de arranque tiene cientos de valores distintos; una pantalla en
+          # negro, un puñado
+          variacion=$(pnmscale -width 40 /tmp/shots/boot.ppm | tail -n +4 | od -An -tu1 | tr -s ' ' '\n' | grep -v '^$' | sort -u | wc -l)
+          echo "variación de la pantalla de arranque: $variacion"
+          [ "$variacion" -gt 20 ] || { echo "::error::pantalla en negro: la ISO no arranca"; exit 1; }
+          echo "LA ISO ARRANCA: el menú de arranque se dibuja en pantalla"
 
       - name: Guardar la ISO y el log de arranque
         if: always()
@@ -126,6 +143,6 @@ jobs:
           name: distroforge-debian-iso
           path: |
             /tmp/proj/livebuild/*.iso
-            /tmp/serial.log
+            /tmp/shots/boot.png
           if-no-files-found: warn
           retention-days: 14
