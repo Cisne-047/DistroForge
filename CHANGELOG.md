@@ -2,7 +2,7 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su etiqueta, con los paquetes firmados y la ISO construida y arrancada en CI.
 
-## [Sin publicar]
+## [1.1.0] - 2026-10-17
 
 ### Añadido
 
@@ -20,6 +20,13 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
   sola unidad de código; `to_hex` ya no formatea byte a byte; el servidor purga
   sesiones caducadas al crear una nueva; la búsqueda de packs no puede hacer
   `panic!` en la ruta de petición (devuelve vacío si SQLite fallara).
+- **CI determinista**: los workflows fijan Trunk `v0.21.14` (Binaryen 123). La
+  0.19.1 que instalaba el action traía Binaryen 116 y no sabía leer el wasm de los
+  Rust recientes, así que el job `ui` fallaba o no según la imagen del runner.
+- **Despliegue reproducible del backend**: nuevo workflow manual
+  `redeploy-sandbox` que recrea el contenedor de un sandbox con la imagen publicada
+  conservando volumen, variables, puerto y política de reinicio, prueba la imagen
+  nueva en un puerto aparte y vuelve a la anterior si no responde.
 
 ### Seguridad
 
