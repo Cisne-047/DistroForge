@@ -1,6 +1,6 @@
 [package]
 name = "web-ui"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "UI web de DistroForge en Leptos 0.7 (CSR + WASM), sustituto de la app React"
 license = "MIT"

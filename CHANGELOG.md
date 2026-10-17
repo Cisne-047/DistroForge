@@ -2,6 +2,24 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está etiquetada**: este es el trabajo acumulado en `main` desde la v0.4.0.
 
+## [0.5.1] - 2026-10-17
+
+### Arreglado
+
+- **Ningún proyecto Debian se construía.** El `auto/config` generado pasaba `--grub-timeout` a `lb config`, opción que no existe: `unrecognized option` y el build moría en el primer paso. Lo encontró el primer horneado real de una ISO en CI, que hasta ahora no existía.
+- **El workflow de CI que se generaba para live-build corría sin `--privileged`**, pero `lb build` monta `/proc` y `/dev/pts` dentro del chroot y fallaba con `mount: permission denied`. El `build.sh` local ya lo llevaba.
+- **Ningún hook se ejecutaba.** Se generaban en `config/hooks/*.hooks.chroot` y live-build solo recorre `config/hooks/{normal,live}/*.<fase>`: el usuario y la contraseña, los repos, los servicios, Flatpak, la red y el fondo no llegaban a la imagen.
+- **Un repo personalizado rompía el build.** El hook escribía la línea con comillas simples, así que `$SIGNED` quedaba literal en el fichero, apt no podía leer el origen (`The list of sources could not be read`) y el build moría.
+- **El timeout de arranque no hacía nada**: solo se aplicaba a GRUB, y en arranque BIOS manda isolinux, cuyo `timeout 0` significa *esperar siempre*.
+- Cuatro avisos de `clippy --all-targets -D warnings` (el comando del CI) que habrían roto la integración al actualizar el toolchain.
+
+### Añadido
+
+- **Auto-actualización del escritorio**: la app comprueba al arrancar si hay versión nueva, la instala y se reinicia. Paquetes firmados con claves propias y manifiesto publicado en el host público. La firma *a nivel de sistema* sigue necesitando un certificado de pago, y así queda documentado.
+- **Una ISO real de punta a punta en CI**: se hornea con live-build, se comprueba que es arrancable (El Torito), que dentro está lo configurado y que **arranca en QEMU**. Sube la ISO y la captura del arranque.
+- **Pruebas de interfaz** con Playwright contra la aplicación construida (WASM incluido), en local y en CI.
+- **Modo claro** de *Grafito & Verde*, con conmutador en la cabecera y `?tema=claro|oscuro`.
+- **URL del backend por defecto**, horneada desde una variable del repositorio: la app de Pages ya no pide configuración para cuentas, galería compartida y Test Drive.
 ## v0.5.0 (sin publicar)
 
 ### Arreglado

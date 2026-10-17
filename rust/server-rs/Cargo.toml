@@ -1,6 +1,6 @@
 [package]
 name = "distroforge-server"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "Servidor DistroForge en Rust (réplica del backend Node/Fastify)"
 license = "MIT"
