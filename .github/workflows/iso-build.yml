@@ -133,7 +133,10 @@ jobs:
           # negro, un puñado
           variacion=$(pnmscale -width 40 /tmp/shots/boot.ppm | tail -n +4 | od -An -tu1 | tr -s ' ' '\n' | grep -v '^$' | sort -u | wc -l)
           echo "variación de la pantalla de arranque: $variacion"
-          [ "$variacion" -gt 20 ] || { echo "::error::pantalla en negro: la ISO no arranca"; exit 1; }
+          # una pantalla en negro da 2-4 valores distintos; el menú, decenas. El
+          # umbral deja margen para no fallar por una captura tomada en un momento
+          # con la pantalla casi uniforme (en CI se midió 26 y en local 196).
+          [ "$variacion" -gt 10 ] || { echo "::error::pantalla en negro: la ISO no arranca"; exit 1; }
           echo "LA ISO ARRANCA: el menú de arranque se dibuja en pantalla"
 
       - name: Guardar la ISO y el log de arranque

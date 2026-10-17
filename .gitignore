@@ -12,3 +12,8 @@ rust/web-ui/target/
 rust/web-ui/dist/
 # build de la UI para servirla en la raíz (túnel y sandbox), no para Pages
 rust/web-ui/dist-tunnel/
+
+# artefactos de las pruebas de interfaz (Playwright)
+tests/ui/node_modules/
+tests/ui/test-results/
+tests/ui/playwright-report/
