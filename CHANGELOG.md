@@ -10,6 +10,29 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
   Node) y su job de CI. El repositorio contiene únicamente la implementación
   actual: núcleo, CLI, UI Leptos/WASM, backend axum y app de escritorio Tauri.
 
+### Seguridad
+
+- **Núcleo (`forge-core`)**: módulo `security` con validadores para locale, zona
+  horaria, teclado, paquetes, URLs, suites, contraseñas, parámetros de GRUB,
+  servicios, puertos, unidades systemd y rutas. `validate()` los aplica y el CLI y
+  el WASM **rechazan** una config inválida; la UI ya lo hacía. Todas las
+  interpolaciones de las recetas (live-build, kickstart, KIWI, archiso, Dockerfile,
+  WSL, cloud-init, Flatpak, NetworkManager) pasan por `sq`/`dq`, los heredocs usan
+  marcadores únicos que el contenido no puede cerrar, el YAML de cloud-init se
+  comilla como JSON y el CLI confina las rutas al directorio de salida.
+- **Backend**: se eliminan los `expect` bajo el candado de SQLite (y el candado
+  tolera envenenamiento), el alta duplicada responde 409 en vez de 500, scrypt
+  corre fuera del candado y en `spawn_blocking`, login y registro tienen límite de
+  intentos, el Test Drive canonicaliza la ruta de la imagen, la confina a
+  `DF_ISO_DIR`, exige extensión de imagen, limita sesiones y comprueba dueño en
+  `DELETE` y en el WebSocket, la API limita cuerpos a 256 KB y packs a 64/2048
+  caracteres, añade cabeceras de seguridad y CSP, marca la cookie `Secure` tras un
+  proxy HTTPS y deja de filtrar errores de SQL/ficheros.
+- **Escritorio y CI**: la app Tauri pasa de `"csp": null` a una CSP real; los
+  workflows declaran permisos mínimos, los secretos se limitan al step que los usa,
+  `flyctl` queda fijado a un commit y se validan el tag de release y los nombres de
+  paquete antes de usarlos en comandos.
+
 ## [1.0.0] - 2026-10-17
 
 Primera versión estable. Lo que la hace 1.0 no es una función nueva, sino que todo

@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -168,6 +168,9 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # Solo este job escribe (la release); el resto del workflow solo lee.
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -182,6 +185,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          # El nombre del tag acaba en argumentos de `gh` y en rutas: se valida.
+          case "$GITHUB_REF_NAME" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::tag inválido (se espera vX.Y.Z): $GITHUB_REF_NAME"; exit 1 ;;
+          esac
           # `download-artifact` con `merge-multiple` deja los paquetes en
           # subcarpetas (dist/deb/, dist/rpm/, dist/appimage/, dist/msi/,
           # dist/nsis/), así que `dist/**` expandía a DIRECTORIOS y
@@ -267,6 +276,12 @@ jobs:
           # partes de 900 000 caracteres en base64.
           for fichero in $(find dist -type f \( -name '*-setup.exe' -o -name '*.AppImage.tar.gz' -o -name '*.AppImage' \) | sort); do
             nombre=$(basename "$fichero")
+            # El nombre viaja dentro de un comando remoto entre comillas simples:
+            # sin esta comprobación, un fichero con `'` inyectaría shell.
+            if ! printf '%s' "$nombre" | grep -Eq '^[A-Za-z0-9._+-]+$'; then
+              echo "::error::nombre de paquete no válido: $nombre"
+              exit 1
+            fi
             echo "-> $nombre ($(du -h "$fichero" | cut -f1))"
             instabox exec "$SB" -- 'rm -f /tmp/paquete.b64'
             base64 -w0 "$fichero" | split -b 900000 - /tmp/trozo-

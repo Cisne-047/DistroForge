@@ -2,9 +2,9 @@
 //! hex que el servidor TS: scrypt(password, salt, 32), N=16384 r=8 p=1),
 //! sesiones con token opaco en cookie httpOnly.
 
-use rand::{RngCore, rng};
+use rand::{rng, RngCore};
 use rusqlite::Connection;
-use scrypt::{Params, scrypt};
+use scrypt::{scrypt, Params};
 
 const SESSION_DAYS: i32 = 30;
 
@@ -37,7 +37,7 @@ fn hash_with_salt_str(password: &str, salt_str: &str) -> String {
         &scrypt_params(),
         &mut out,
     )
-        .expect("scrypt no puede fallar con parámetros fijos");
+    .expect("scrypt no puede fallar con parámetros fijos");
     to_hex(&out)
 }
 
@@ -71,9 +71,15 @@ pub fn random_token() -> String {
 }
 
 pub fn create_user(db: &Connection, name: &str, password: &str) -> rusqlite::Result<i64> {
+    create_user_hashed(db, name, &hash_password(password))
+}
+
+/// Alta con el hash ya calculado (para no retener el candado de la BD mientras
+/// corre scrypt, que es lento a propósito).
+pub fn create_user_hashed(db: &Connection, name: &str, pass_hash: &str) -> rusqlite::Result<i64> {
     db.execute(
         "INSERT INTO users (name, pass_hash) VALUES (?1, ?2)",
-        rusqlite::params![name, hash_password(password)],
+        rusqlite::params![name, pass_hash],
     )?;
     Ok(db.last_insert_rowid())
 }
@@ -100,7 +106,7 @@ pub fn find_user(db: &Connection, name: &str) -> Option<FoundUser> {
 }
 
 /// Crea una sesión y devuelve el token (guárdalo en cookie).
-pub fn create_session(db: &Connection, user_id: i64) -> String {
+pub fn create_session(db: &Connection, user_id: i64) -> rusqlite::Result<String> {
     let token = random_token();
     db.execute(
         &format!(
@@ -108,9 +114,13 @@ pub fn create_session(db: &Connection, user_id: i64) -> String {
              VALUES (?1, ?2, datetime('now', '+{SESSION_DAYS} days'))"
         ),
         rusqlite::params![token, user_id],
-    )
-    .expect("insertar sesión");
-    token
+    )?;
+    Ok(token)
+}
+
+/// Un token de sesión son 24 bytes en hex (48 caracteres).
+pub fn valid_token(token: &str) -> bool {
+    token.len() == 48 && token.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 pub struct CurrentUser {
@@ -139,6 +149,9 @@ pub fn user_for_token(db: &Connection, token: &str) -> Option<CurrentUser> {
 
 pub fn destroy_session(db: &Connection, token: Option<&str>) {
     if let Some(token) = token {
-        let _ = db.execute("DELETE FROM sessions WHERE token = ?1", rusqlite::params![token]);
+        let _ = db.execute(
+            "DELETE FROM sessions WHERE token = ?1",
+            rusqlite::params![token],
+        );
     }
 }

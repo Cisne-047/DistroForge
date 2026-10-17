@@ -1,5 +1,6 @@
 //! Apps Flatpak / Flathub. Port de `src/generators/flatpak.ts`.
 
+use crate::generators::shell;
 use crate::types::DistroConfig;
 
 /// Paquete que habilita el runtime de Flatpak.
@@ -35,11 +36,17 @@ pub fn flatpak_shell_lines(cfg: &DistroConfig, prefix: &str) -> Vec<String> {
     if apps.is_empty() {
         return vec![];
     }
+    let ids = apps
+        .iter()
+        .filter(|a| crate::security::valid_flatpak_id(a))
+        .map(|a| shell::sq(a))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if ids.is_empty() {
+        return vec![];
+    }
     vec![
         format!("{prefix}flatpak remote-add --if-not-exists flathub {FLATHUB}"),
-        format!(
-            "{prefix}flatpak install -y --noninteractive flathub {}",
-            apps.join(" ")
-        ),
+        format!("{prefix}flatpak install -y --noninteractive flathub {ids}"),
     ]
 }

@@ -10,11 +10,20 @@ use forge_core::generators::{generate_project as core_generate, validate as core
 use forge_core::types::DistroConfig;
 
 /// Genera el proyecto completo a partir de un JSON de `DistroConfig`.
-/// Devuelve `{"ruta": "contenido", ...}` o `Err` si el JSON no parsea.
+/// Devuelve `{"ruta": "contenido", ...}` o `Err` si el JSON no parsea o la
+/// config no pasa la validación (una config compartida por URL no puede saltarse
+/// las comprobaciones de seguridad).
 #[wasm_bindgen]
 pub fn generate_project(cfg_json: String) -> Result<String, JsValue> {
     let cfg: DistroConfig = serde_json::from_str(&cfg_json)
         .map_err(|e| JsValue::from_str(&format!("config inválida: {e}")))?;
+    let problems = core_validate(&cfg);
+    if !problems.is_empty() {
+        return Err(JsValue::from_str(&format!(
+            "config no válida: {}",
+            problems.join("; ")
+        )));
+    }
     let files = core_generate(&cfg);
     serde_json::to_string(&files).map_err(|e| JsValue::from_str(&e.to_string()))
 }
@@ -40,6 +49,5 @@ pub fn encode_config(cfg_json: String) -> Result<String, JsValue> {
 /// (port de `share.decodeConfig`).
 #[wasm_bindgen]
 pub fn decode_config(hash: String) -> Result<Option<String>, JsValue> {
-    Ok(forge_core::share::decode_config(&hash)
-        .and_then(|cfg| serde_json::to_string(&cfg).ok()))
+    Ok(forge_core::share::decode_config(&hash).and_then(|cfg| serde_json::to_string(&cfg).ok()))
 }

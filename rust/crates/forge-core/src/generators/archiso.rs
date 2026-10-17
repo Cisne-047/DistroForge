@@ -13,6 +13,7 @@ use crate::generators::branding::{
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_apps, flatpak_packages, has_flatpak_apps, FLATHUB};
 use crate::generators::livebuild::sanitize_alias;
+use crate::generators::shell::sq;
 use crate::types::{js_num, DistroConfig};
 
 /// Ficheros del proyecto archiso, en el orden de construcción del TS.
@@ -96,7 +97,11 @@ pub fn archiso_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             "archiso/airootfs/etc/systemd/system/distroforge-flatpak.service".to_string(),
             format!(
                 "[Unit]\nDescription=DistroForge - configura Flathub e instala apps Flatpak\nWants=network-online.target\nAfter=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/bin/flatpak remote-add --if-not-exists flathub {FLATHUB}\nExecStart=/usr/bin/flatpak install -y --noninteractive flathub {}\nRemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target\n",
-                flatpak_apps(cfg).join(" ")
+                flatpak_apps(cfg)
+                    .iter()
+                    .map(|a| sq(a))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             ),
         ));
         flatpak_files.push((
@@ -157,7 +162,11 @@ pub fn archiso_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             ),
         ));
     }
-    for name in ["distroforge-users", "distroforge-services", "distroforge-locale"] {
+    for name in [
+        "distroforge-users",
+        "distroforge-services",
+        "distroforge-locale",
+    ] {
         if account_files
             .iter()
             .any(|(p, _)| *p == format!("archiso/airootfs/etc/systemd/system/{name}.service"))
@@ -207,7 +216,10 @@ pub fn archiso_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     }
 
     let mut files: Vec<(String, String)> = vec![
-        ("archiso/packages.x86_64".to_string(), format!("{packages}\n")),
+        (
+            "archiso/packages.x86_64".to_string(),
+            format!("{packages}\n"),
+        ),
         ("archiso/pacman.conf".to_string(), pacman_conf),
         (
             "archiso/airootfs/etc/hostname".to_string(),

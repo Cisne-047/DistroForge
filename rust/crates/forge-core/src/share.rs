@@ -23,8 +23,16 @@ fn b64_encode(data: &[u8]) -> String {
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
         out.push(ALPHABET[(n >> 18) as usize & 63] as char);
         out.push(ALPHABET[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 { ALPHABET[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { ALPHABET[n as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            ALPHABET[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            ALPHABET[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -142,7 +150,10 @@ mod tests {
         assert_eq!(b64_encode(b"foob"), "Zm9vYg==");
         assert_eq!(b64_encode(b"fooba"), "Zm9vYmE=");
         assert_eq!(b64_encode(b"foobar"), "Zm9vYmFy");
-        assert_eq!(b64_decode("Zm9vYmFy").as_deref(), Some(b"foobar".as_slice()));
+        assert_eq!(
+            b64_decode("Zm9vYmFy").as_deref(),
+            Some(b"foobar".as_slice())
+        );
         assert!(b64_decode("!!!").is_none());
         assert!(b64_decode("A===").is_none());
     }

@@ -9,7 +9,7 @@ use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines};
 use crate::generators::livebuild::sanitize_alias;
 use crate::generators::network::{dotted_mask, static_network};
-use crate::generators::shell::dirname_of;
+use crate::generators::shell::{dirname_of, dq};
 use crate::types::{js_num, ArchId, DistroConfig, ExtraFile};
 
 /// Bloque %post que vuelca cada fichero extra con heredoc (rutas absolutas).
@@ -18,11 +18,13 @@ pub fn extra_file_post_lines(extra_files: &[ExtraFile]) -> Vec<String> {
         .iter()
         .enumerate()
         .flat_map(|(i, f)| {
+            // Marcador único para que el contenido no pueda cerrar el heredoc.
+            let marker = crate::security::heredoc_marker(&format!("DFEOF{i}"), &f.content);
             vec![
-                format!("mkdir -p {}", dirname_of(&f.path)),
-                format!("cat > {} <<'DFEOF{i}'", f.path),
+                format!("mkdir -p \"{}\"", dq(&dirname_of(&f.path))),
+                format!("cat > \"{}\" <<'{marker}'", dq(&f.path)),
                 f.content.clone(),
-                format!("DFEOF{i}"),
+                marker,
             ]
         })
         .collect()
@@ -45,20 +47,20 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let mut post_lines: Vec<String> = vec![
-        "echo \"DistroForge\" > /etc/distroforge-release".to_string(),
-    ];
+    let mut post_lines: Vec<String> =
+        vec!["echo \"DistroForge\" > /etc/distroforge-release".to_string()];
     // instalación sin verificación (anaconda no puede preguntar), pero el
     // sistema final queda confiando en las keys para futuras actualizaciones
     for r in &repos {
         if !r.gpg_key.is_empty() {
-            post_lines.push(format!("rpm --import \"{}\"", r.gpg_key));
+            post_lines.push(format!("rpm --import \"{}\"", dq(&r.gpg_key)));
         }
     }
     if !cfg.motd.is_empty() {
-        post_lines.push("cat > /etc/motd <<'MOTDEOF'".to_string());
+        let marker = crate::security::heredoc_marker("MOTDEOF", &cfg.motd);
+        post_lines.push(format!("cat > /etc/motd <<'{marker}'"));
         post_lines.push(cfg.motd.clone());
-        post_lines.push("MOTDEOF".to_string());
+        post_lines.push(marker);
     }
     if cfg.cloud_init {
         post_lines.push("mkdir -p /etc/cloud/cloud.cfg.d".to_string());
@@ -136,8 +138,10 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         .collect::<Vec<_>>()
         .join("");
 
-    let mut pkg_items: Vec<String> =
-        desktop_packages(cfg.base, &cfg.desktop).iter().map(|s| s.to_string()).collect();
+    let mut pkg_items: Vec<String> = desktop_packages(cfg.base, &cfg.desktop)
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     pkg_items.extend(flatpak_packages(cfg));
     pkg_items.extend(cfg.packages.iter().cloned());
     if cfg.cloud_init {
@@ -173,5 +177,8 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         cfg.name, cfg.name
     );
 
-    vec![("fedora/ks.cfg".to_string(), ks), ("build.sh".to_string(), build_sh)]
+    vec![
+        ("fedora/ks.cfg".to_string(), ks),
+        ("build.sh".to_string(), build_sh),
+    ]
 }

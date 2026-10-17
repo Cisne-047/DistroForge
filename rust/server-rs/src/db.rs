@@ -49,6 +49,11 @@ pub fn open_db(path: &str) -> Connection {
     // node:sqlite activa los FOREIGN KEYs por defecto; replicamos.
     db.pragma_update(None, "foreign_keys", "ON")
         .expect("pragma foreign_keys");
+    // WAL y espera ante bloqueos: menos latencia de escritura y sin "database is
+    // locked" en ráfagas. En :memory: el journal_mode se queda en "memory".
+    let _ = db.busy_timeout(std::time::Duration::from_secs(5));
+    let _ = db.pragma_update(None, "journal_mode", "WAL");
+    let _ = db.pragma_update(None, "synchronous", "NORMAL");
     db.execute_batch(SCHEMA).expect("crear esquema");
     db.execute("DELETE FROM sessions WHERE expires < datetime('now')", [])
         .expect("limpiar sesiones");
@@ -96,7 +101,13 @@ pub fn search_packs(db: &Connection, query: &str, limit: i64) -> Vec<PackRow> {
     }
     let safe: String = q
         .chars()
-        .map(|c| if c == '"' || c == '\'' || c == '^' { ' ' } else { c })
+        .map(|c| {
+            if c == '"' || c == '\'' || c == '^' {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect::<String>()
         .trim()
         .to_string();
@@ -108,26 +119,28 @@ pub fn search_packs(db: &Connection, query: &str, limit: i64) -> Vec<PackRow> {
         ))
         .and_then(|mut stmt| {
             // "SELECT p.id, p.owner, ..." — prefijar p. a cada columna
-            stmt.query_map(
-                rusqlite::params![format!("\"{safe}\""), limit],
-                row_to_pack,
-            )
-            .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
+            stmt.query_map(rusqlite::params![format!("\"{safe}\""), limit], row_to_pack)
+                .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
         });
     match fts {
         Ok(rows) => rows,
-        Err(_) => db
-            .prepare(&format!(
+        Err(_) => {
+            // `%` y `_` son comodines de LIKE: se escapan para que la búsqueda
+            // sea literal (SQL ya va parametrizado).
+            let like = safe
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_");
+            db.prepare(&format!(
                 "SELECT {PACK_COLS} FROM packs
-                 WHERE name LIKE ?1 OR desc LIKE ?1 ORDER BY id DESC LIMIT ?2"
+                 WHERE name LIKE ?1 ESCAPE '\\' OR desc LIKE ?1 ESCAPE '\\'
+                 ORDER BY id DESC LIMIT ?2"
             ))
             .expect("prepare like")
-            .query_map(
-                rusqlite::params![format!("%{safe}%"), limit],
-                row_to_pack,
-            )
+            .query_map(rusqlite::params![format!("%{like}%"), limit], row_to_pack)
             .expect("query like")
             .filter_map(Result::ok)
-            .collect(),
+            .collect()
+        }
     }
 }

@@ -30,41 +30,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
+      # Booleano no secreto: los steps que no lo necesitan no ven la clave.
+      HAS_INSTABOX: ${{ secrets.INSTABOX_API_KEY != '' }}
       INSTABOX_API_URL: https://api.instabox.sh
       SB: df-smoke-${{ github.run_id }}
 
     steps:
       - name: Sin INSTABOX_API_KEY no hay nada que hacer
-        if: env.INSTABOX_API_KEY == ''
+        if: env.HAS_INSTABOX == 'false'
         run: |
           echo "::notice::No hay secreto INSTABOX_API_KEY; se omite la prueba en sandbox."
           echo "Crea una clave con 'instabox keys create --name ci --scope machines:read machines:write machines:delete'"
           echo "y guárdala en Settings → Secrets and variables → Actions como INSTABOX_API_KEY."
 
       - name: Checkout
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         uses: actions/checkout@v4
 
       - name: Toolchain
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Target wasm32
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         run: rustup target add wasm32-unknown-unknown
 
       - name: Trunk
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         uses: jetli/trunk-action@v0.5.0
 
       - name: Interfaz (la imagen la incluye)
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         working-directory: rust/web-ui
         run: trunk build --release --public-url /
 
       - name: CLI de instabox
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
         run: |
           # Sin sudo y en un directorio del propio runner: con sudo, el CLI
           # acababa sin poder escribir su estado (~/.config/instabox).
@@ -75,7 +76,9 @@ jobs:
           instabox --version
 
       - name: "Crear el sandbox (reintentos: a veces no hay capacidad)"
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
           # Solo se reintenta si el motivo es la capacidad; cualquier otro error
           # se muestra tal cual (antes, un fallo de permisos se disfrazaba de
@@ -101,7 +104,9 @@ jobs:
           exit 0
 
       - name: Construir la imagen dentro del sandbox
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
           tar czf /tmp/src.tgz rust/server-rs rust/web-ui/dist .dockerignore
           base64 -w0 /tmp/src.tgz | instabox exec "$SB" --stdin -- \
@@ -116,7 +121,9 @@ jobs:
           instabox exec "$SB" -- 'docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | head -3'
 
       - name: Ejecutar y comprobar de verdad
-        if: env.INSTABOX_API_KEY != ''
+        if: env.HAS_INSTABOX == 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
           instabox exec "$SB" -- 'docker run -d --name df -p 8080:8080 -e DF_DB_PATH=/data/df.db distroforge-server:smoke'
           sleep 10
@@ -157,5 +164,7 @@ jobs:
           exit 1
 
       - name: Borrar el sandbox
-        if: always() && env.INSTABOX_API_KEY != ''
+        if: always() && env.HAS_INSTABOX == 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: instabox rm "$SB" || true

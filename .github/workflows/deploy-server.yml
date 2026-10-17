@@ -16,12 +16,14 @@ permissions:
 jobs:
   fly:
     runs-on: ubuntu-latest
+    # El token NO va como env del job: solo lo recibe el step que despliega, no
+    # las acciones de terceros (checkout, trunk…).
     env:
-      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      HAS_FLY: ${{ secrets.FLY_API_TOKEN != '' }}
 
     steps:
       - name: Sin FLY_API_TOKEN no hay nada que hacer
-        if: env.FLY_API_TOKEN == ''
+        if: env.HAS_FLY == 'false'
         run: |
           echo "::notice::No hay secreto FLY_API_TOKEN; se omite el despliegue."
           echo "Para activarlo: crea la app (fly launch), el volumen (fly volumes create df_data --size 1)"
@@ -29,37 +31,41 @@ jobs:
           echo "Guía completa: docs/DESPLIEGUE.md"
 
       - name: Checkout
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         uses: actions/checkout@v4
 
       - name: Toolchain
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Target wasm32
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         run: rustup target add wasm32-unknown-unknown
 
       - name: Trunk
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         uses: jetli/trunk-action@v0.5.0
 
       - name: Interfaz
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         working-directory: rust/web-ui
         run: trunk build --release --public-url /
 
       - name: flyctl
-        if: env.FLY_API_TOKEN != ''
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        if: env.HAS_FLY == 'true'
+        # Pinneado a un commit (antes @master): una acción de terceros no debe
+        # poder cambiar bajo nuestros pies.
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
 
       - name: Desplegar
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         # el contexto es la raíz porque la imagen incluye la interfaz compilada
         run: flyctl deploy . --config rust/server-rs/fly.toml --remote-only
 
       - name: Comprobar que responde
-        if: env.FLY_API_TOKEN != ''
+        if: env.HAS_FLY == 'true'
         run: |
           APP=$(grep -m1 '^app' rust/server-rs/fly.toml | cut -d'"' -f2)
           echo "app: $APP"

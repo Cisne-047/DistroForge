@@ -3,7 +3,7 @@
 use crate::catalog::{base_by_id, deb_arch, desktop_packages, effective_repos};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines};
 use crate::generators::livebuild::sanitize_alias;
-use crate::generators::shell::{dirname_of, sq};
+use crate::generators::shell::{dirname_of, dq, sq};
 use crate::types::{DistroConfig, EngineId};
 
 fn wsl_conf(cfg: &DistroConfig) -> String {
@@ -18,8 +18,10 @@ pub fn wsl_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     let base = base_by_id(cfg.base);
     let sys = &cfg.system;
     let name = &cfg.name;
-    let mut pkgs: Vec<String> =
-        desktop_packages(cfg.base, &cfg.desktop).iter().map(|s| s.to_string()).collect();
+    let mut pkgs: Vec<String> = desktop_packages(cfg.base, &cfg.desktop)
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     pkgs.extend(flatpak_packages(cfg));
     pkgs.extend(cfg.packages.iter().cloned());
     let repos = effective_repos(cfg);
@@ -29,8 +31,13 @@ pub fn wsl_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         .extra_files
         .iter()
         .map(|f| {
-            let dir = dirname_of(&f.path);
-            format!("mkdir -p /rootfs{dir}\ncat > /rootfs{} <<'DFEOF'\n{}\nDFEOF", f.path, f.content)
+            let dir = dq(&dirname_of(&f.path));
+            let path = dq(&f.path);
+            let marker = crate::security::heredoc_marker("DFEOF", &f.content);
+            format!(
+                "mkdir -p \"/rootfs{dir}\"\ncat > \"/rootfs{path}\" <<'{marker}'\n{}\n{marker}",
+                f.content
+            )
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -41,9 +48,9 @@ pub fn wsl_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         .map(|u| {
             format!(
                 "chroot /rootfs id \"{}\" >/dev/null 2>&1 || chroot /rootfs useradd -m -s /bin/bash{} \"{}\"\necho {} | chroot /rootfs chpasswd",
-                u.name,
+                dq(&u.name),
                 if u.admin { " -G wheel" } else { "" },
-                u.name,
+                dq(&u.name),
                 sq(&format!("{}:{}", u.name, u.password))
             )
         })
@@ -67,17 +74,23 @@ pub fn wsl_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let pre_conf = [extra_files_block, flatpak_block, wsl_user_lines, wsl_service_lines]
-        .into_iter()
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let pre_conf = [
+        extra_files_block,
+        flatpak_block,
+        wsl_user_lines,
+        wsl_service_lines,
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    .collect::<Vec<_>>()
+    .join("\n");
 
+    let conf = wsl_conf(cfg);
+    let conf_marker = crate::security::heredoc_marker("WSLEOF", &conf);
     let conf_lines = format!(
-        "cat > /rootfs/etc/wsl.conf <<'WSLEOF'\n{}\nWSLEOF\necho \"{}\" > /rootfs/etc/hostname\nln -sf /usr/share/zoneinfo/{} /rootfs/etc/localtime",
-        wsl_conf(cfg),
-        sys.hostname,
-        sys.timezone
+        "cat > /rootfs/etc/wsl.conf <<'{conf_marker}'\n{conf}\n{conf_marker}\necho \"{}\" > /rootfs/etc/hostname\nln -sf /usr/share/zoneinfo/{} /rootfs/etc/localtime",
+        dq(&sys.hostname),
+        dq(&sys.timezone)
     );
 
     let script = match engine {
@@ -139,16 +152,18 @@ pub fn wsl_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             // Dockerfile); se replica tal cual.
             let repo_lines = repos
                 .iter()
-                .map(|r| {
+                .enumerate()
+                .map(|(i, r)| {
                     format!(
                         "printf '[{}]\\nSigLevel = Optional TrustAll\\nServer = {}\\n' >> /etc/pacman.conf",
-                        r.alias, r.url
+                        sanitize_alias(&r.alias, i),
+                        r.url
                     )
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
             format!(
-                "#!/usr/bin/env bash\nset -euo pipefail\n# DistroForge - rootfs WSL para {} (pacstrap)\npacman -Sy --noconfirm arch-install-scripts\nrm -rf /rootfs && mkdir -p /rootfs\n{}\npacstrap -c /rootfs base sudo {}\narch-chroot /rootfs useradd -m -s /bin/bash -G wheel {}\narch-echo {} | chroot /rootfs chpasswd\n{pre}{conf}\nmkdir -p out\ntar -C /rootfs -cpf out/{name}-wsl.tar .\necho \"Rootfs WSL listo en ./out/{name}-wsl.tar\"\n",
+                "#!/usr/bin/env bash\nset -euo pipefail\n# DistroForge - rootfs WSL para {} (pacstrap)\npacman -Sy --noconfirm arch-install-scripts\nrm -rf /rootfs && mkdir -p /rootfs\n{}\npacstrap -c /rootfs base sudo {}\narch-chroot /rootfs useradd -m -s /bin/bash -G wheel {}\necho {} | arch-chroot /rootfs chpasswd\n{pre}{conf}\nmkdir -p out\ntar -C /rootfs -cpf out/{name}-wsl.tar .\necho \"Rootfs WSL listo en ./out/{name}-wsl.tar\"\n",
                 base.label,
                 repo_lines,
                 pkgs.join(" "),

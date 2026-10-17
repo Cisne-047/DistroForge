@@ -156,10 +156,7 @@ pub static TEMPLATES: std::sync::LazyLock<Vec<Template>> = std::sync::LazyLock::
             desc: "VLC y GIMP nativos + Flatpaks de Flathub.",
             patch: TemplatePatch {
                 packages: Some(vec!["vlc".into(), "gimp".into(), "audacity".into()]),
-                flatpak_apps: Some(vec![
-                    "org.videolan.VLC".into(),
-                    "org.gimp.GIMP".into(),
-                ]),
+                flatpak_apps: Some(vec!["org.videolan.VLC".into(), "org.gimp.GIMP".into()]),
                 ..Default::default()
             },
         },
@@ -175,27 +172,69 @@ pub fn apply_template(cfg: &DistroConfig, tpl: &Template) -> DistroConfig {
     let mut out = cfg.clone();
 
     // `...rest`: todos los campos del parche salvo desktop/system/grub.
-    if let Some(v) = &p.name { out.name = v.clone(); }
-    if let Some(v) = &p.base { out.base = *v; }
-    if let Some(v) = &p.packages { out.packages = v.clone(); }
-    if let Some(v) = &p.repos { out.repos = v.clone(); }
-    if let Some(v) = &p.output { out.output = *v; }
-    if let Some(v) = &p.flatpak_apps { out.flatpak_apps = v.clone(); }
-    if let Some(v) = &p.extra_files { out.extra_files = v.clone(); }
-    if let Some(v) = &p.users { out.users = v.clone(); }
-    if let Some(v) = &p.services { out.services = v.clone(); }
-    if let Some(v) = &p.network { out.network = v.clone(); }
-    if let Some(v) = &p.firewall { out.firewall = *v; }
-    if let Some(v) = &p.arch { out.arch = *v; }
-    if let Some(v) = &p.advanced { out.advanced = *v; }
-    if let Some(v) = &p.custom_iso { out.custom_iso = v.clone(); }
-    if let Some(v) = &p.autologin { out.autologin = *v; }
-    if let Some(v) = &p.autostart { out.autostart = v.clone(); }
-    if let Some(v) = &p.firewall_ports { out.firewall_ports = v.clone(); }
-    if let Some(v) = &p.boot_target { out.boot_target = *v; }
-    if let Some(v) = &p.cloud_init { out.cloud_init = *v; }
-    if let Some(v) = &p.motd { out.motd = v.clone(); }
-    if let Some(v) = &p.wallpaper { out.wallpaper = v.clone(); }
+    if let Some(v) = &p.name {
+        out.name = v.clone();
+    }
+    if let Some(v) = &p.base {
+        out.base = *v;
+    }
+    if let Some(v) = &p.packages {
+        out.packages = v.clone();
+    }
+    if let Some(v) = &p.repos {
+        out.repos = v.clone();
+    }
+    if let Some(v) = &p.output {
+        out.output = *v;
+    }
+    if let Some(v) = &p.flatpak_apps {
+        out.flatpak_apps = v.clone();
+    }
+    if let Some(v) = &p.extra_files {
+        out.extra_files = v.clone();
+    }
+    if let Some(v) = &p.users {
+        out.users = v.clone();
+    }
+    if let Some(v) = &p.services {
+        out.services = v.clone();
+    }
+    if let Some(v) = &p.network {
+        out.network = v.clone();
+    }
+    if let Some(v) = &p.firewall {
+        out.firewall = *v;
+    }
+    if let Some(v) = &p.arch {
+        out.arch = *v;
+    }
+    if let Some(v) = &p.advanced {
+        out.advanced = *v;
+    }
+    if let Some(v) = &p.custom_iso {
+        out.custom_iso = v.clone();
+    }
+    if let Some(v) = &p.autologin {
+        out.autologin = *v;
+    }
+    if let Some(v) = &p.autostart {
+        out.autostart = v.clone();
+    }
+    if let Some(v) = &p.firewall_ports {
+        out.firewall_ports = v.clone();
+    }
+    if let Some(v) = &p.boot_target {
+        out.boot_target = *v;
+    }
+    if let Some(v) = &p.cloud_init {
+        out.cloud_init = *v;
+    }
+    if let Some(v) = &p.motd {
+        out.motd = v.clone();
+    }
+    if let Some(v) = &p.wallpaper {
+        out.wallpaper = v.clone();
+    }
 
     // Desktop: solo si la base lo tiene ("" cuenta como ausente, como en el
     // TS, donde `desktop &&` es falsy con cadena vacía).
@@ -208,8 +247,12 @@ pub fn apply_template(cfg: &DistroConfig, tpl: &Template) -> DistroConfig {
 
     // grub y system: fusión por claves.
     if let Some(g) = &p.grub {
-        if let Some(v) = g.timeout { out.grub.timeout = v; }
-        if let Some(v) = &g.extra_params { out.grub.extra_params = v.clone(); }
+        if let Some(v) = g.timeout {
+            out.grub.timeout = v;
+        }
+        if let Some(v) = &g.extra_params {
+            out.grub.extra_params = v.clone();
+        }
     }
     if let Some(s) = &p.system {
         let SystemConfig {
@@ -220,12 +263,24 @@ pub fn apply_template(cfg: &DistroConfig, tpl: &Template) -> DistroConfig {
             locale,
             keyboard,
         } = &mut out.system;
-        if let Some(v) = &s.hostname { *hostname = v.clone(); }
-        if let Some(v) = &s.username { *username = v.clone(); }
-        if let Some(v) = &s.password { *password = v.clone(); }
-        if let Some(v) = &s.timezone { *timezone = v.clone(); }
-        if let Some(v) = &s.locale { *locale = v.clone(); }
-        if let Some(v) = &s.keyboard { *keyboard = v.clone(); }
+        if let Some(v) = &s.hostname {
+            *hostname = v.clone();
+        }
+        if let Some(v) = &s.username {
+            *username = v.clone();
+        }
+        if let Some(v) = &s.password {
+            *password = v.clone();
+        }
+        if let Some(v) = &s.timezone {
+            *timezone = v.clone();
+        }
+        if let Some(v) = &s.locale {
+            *locale = v.clone();
+        }
+        if let Some(v) = &s.keyboard {
+            *keyboard = v.clone();
+        }
     }
     out
 }

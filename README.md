@@ -70,6 +70,18 @@ DF_DB_PATH=/data/df.db cargo run             # SQLite en disco (por defecto :mem
 
 Tiene `Dockerfile` (Debian slim + QEMU, usuario sin privilegios y `HEALTHCHECK` contra `GET /api/health`), `docker-compose.yml` y un workflow que publica la imagen en GHCR. La UI apunta al backend con la URL que configures en la sección *Servidor* (se guarda en el navegador). Guía completa en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
 
+Variables de entorno del backend:
+
+| Variable | Para qué |
+|---|---|
+| `PORT` | puerto de escucha (8080 por defecto) |
+| `DF_DB_PATH` | SQLite en disco (`:memory:` por defecto) |
+| `DF_WEB_DIR` | sirve la UI compilada en el mismo origen (si existe) |
+| `QEMU_BIN` | binario de QEMU del Test Drive |
+| `DF_ISO_DIR` | confina las imágenes que puede arrancar el Test Drive; sin ella solo se aceptan rutas absolutas existentes con extensión `.iso/.img/.qcow2/.raw` fuera de `/proc`, `/sys` y `/dev` |
+
+El servidor envía `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options` y una CSP estricta en todo menos en `/vnc.html` (noVNC carga su cliente desde CDN), limita el cuerpo de la API a 256 KB, y marca la cookie de sesión `Secure` cuando la petición llega con `X-Forwarded-Proto: https`.
+
 ## Desarrollo
 
 ```bash
@@ -96,6 +108,15 @@ Hay además dos workflows que no se conforman con compilar:
 ## Seguridad
 
 Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan kickstart/preseed) y en los enlaces para compartir. Usa una contraseña provisional en cualquier proyecto que vayas a publicar.
+
+El modelo de defensa es explícito, porque las recetas son **código que se ejecuta** en un chroot:
+
+- **Validación en un solo sitio** (`forge_core::security`): locale, zona horaria, teclado, paquetes, URLs, suites, usuarios, puertos, unidades y rutas se comprueban antes de usarse. La UI, el CLI (`forge dump`) y el WASM (`generate_project`) rechazan una config que no pase `validate()`, vengan de donde vengan (pack de la galería, enlace compartido o JSON a mano).
+- **Escape en cada sink**: lo que acaba en un script pasa por `sq`/`dq`, los heredocs usan un marcador único que el contenido no puede cerrar, el YAML de cloud-init se comilla como JSON y las rutas se confinan al directorio de salida.
+- **Backend sin pánicos**: el candado de la BD tolera envenenamiento, el alta duplicada responde 409, scrypt corre fuera del candado y del hilo de la runtime, hay límite de intentos por cuenta y de tamaño para packs y cuerpos, y los errores internos no filtran SQL ni rutas.
+- **Test Drive confinado**: ruta canonicalizada, fichero regular con extensión de imagen, directorio permitido por `DF_ISO_DIR`, límite de sesiones y comprobación de dueño en `DELETE` y en el WebSocket (un id ajeno responde 404).
+- **Escritorio**: la app Tauri ya no lleva `"csp": null`; sirve su UI local con una CSP que solo permite scripts propios y WASM.
+- **CI**: permisos mínimos por workflow, secretos solo en los steps que los usan, `flyctl` fijado a un commit y validación de tags y nombres de paquete antes de pasar a un comando.
 
 ## Roadmap
 

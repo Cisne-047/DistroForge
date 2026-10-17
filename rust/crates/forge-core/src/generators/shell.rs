@@ -2,16 +2,35 @@
 //! `src/generators/shell.ts`.
 
 /// Single-quote seguro para shell: `foo` → `'foo'`, `it's` → `'it'\''s'`.
+/// Una sola pasada (sin allocaciones intermedias).
 pub fn sq(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
 }
 
 /// Double-quote seguro: escapa backslash, comillas, `$` y backtick.
+/// Una sola pasada en vez de cuatro `replace` encadenados.
 pub fn dq(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('$', "\\$")
-        .replace('`', "\\`")
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '$' => out.push_str("\\$"),
+            '`' => out.push_str("\\`"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 /// dirname POSIX de una ruta ("/etc/x.conf" → "/etc", "/f" → "/", "f" → "f",
@@ -28,9 +47,15 @@ pub fn dirname_of(p: &str) -> String {
     }
 }
 
-/// Escaping para literales dentro de unit files de systemd (`''` y `%%`).
+/// Escaping para literales dentro de unit files de systemd y de los `sh -c` que
+/// estos ejecutan: `''` para las comillas, `%%` para los especificadores y
+/// `\$`/`` \` `` para que el shell interno no expanda nada.
 pub fn systemd_safe(s: &str) -> String {
-    s.replace('\'', "'\\''").replace('%', "%%")
+    s.replace('\\', "\\\\")
+        .replace('\'', "'\\''")
+        .replace('$', "\\$")
+        .replace('`', "\\`")
+        .replace('%', "%%")
 }
 
 #[cfg(test)]

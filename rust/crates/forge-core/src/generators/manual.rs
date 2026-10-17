@@ -7,8 +7,10 @@ use crate::types::DistroConfig;
 /// Ficheros del proyecto manual, en el orden de construcción del TS.
 pub fn manual_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     let base = base_by_id(cfg.base);
-    let mut pkgs: Vec<String> =
-        desktop_packages(cfg.base, &cfg.desktop).iter().map(|s| s.to_string()).collect();
+    let mut pkgs: Vec<String> = desktop_packages(cfg.base, &cfg.desktop)
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     pkgs.extend(cfg.packages.iter().cloned());
     let pkgs = pkgs.join("\n");
     let is_gentoo = cfg.base == crate::types::BaseId::Gentoo;

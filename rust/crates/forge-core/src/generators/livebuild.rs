@@ -13,7 +13,7 @@ use crate::generators::branding::{
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines, has_flatpak_apps};
 use crate::generators::network::{nm_connection, static_network};
-use crate::generators::shell::dq;
+use crate::generators::shell::{dq, sq};
 use crate::types::{js_num, DistroConfig};
 
 /// Sanea un alias de repo para nombres de fichero
@@ -81,8 +81,10 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         }
     );
 
+    let boot_arg = sq(&boot_append);
+
     let auto_config = format!(
-        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --bootappend-live \"{boot_append}\" \\\n    --bootappend-install \"{boot_install}\" \\\n{di_line}    \"$@\"\n",
+        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --bootappend-live {boot_arg} \\\n    --bootappend-install \"{boot_install}\" \\\n{di_line}    \"$@\"\n",
         label = base.label,
         lb_arch = lb_arch,
         distro = distro,
@@ -90,7 +92,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         mirror = mirror,
         flavour = flavour,
         vol = slice28(&cfg.name),
-        boot_append = boot_append,
+        boot_arg = boot_arg,
         // `--bootappend-install` SIEMPRE (vacío si no es desatendida); el
         // `--debian-installer live` solo con unattended. El TS mete DOS
         // backslashes en esa línea (`"\\\\\n"` en su código): se replica tal cual.
@@ -110,7 +112,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
 
     let user_hook = format!(
         "#!/bin/sh\nset -e\n# DistroForge - usuario y contrasena del live\nid \"{user}\" >/dev/null 2>&1 || useradd -m -s /bin/bash -G sudo \"{user}\"\necho \"{uq}:{pq}\" | chpasswd\nusermod -aG sudo \"{user}\" || true\n{extras}\n",
-        user = sys.username,
+        user = dq(&sys.username),
         uq = dq(&sys.username),
         pq = dq(&sys.password),
         extras = extra_user_shell_lines(cfg, AdminGroup::Sudo).join("\n")
@@ -262,8 +264,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     ];
     if cfg.cloud_init {
         files.push((
-            "livebuild/config/includes.chroot/etc/cloud/cloud.cfg.d/80-distroforge.cfg"
-                .to_string(),
+            "livebuild/config/includes.chroot/etc/cloud/cloud.cfg.d/80-distroforge.cfg".to_string(),
             cloud_init_yaml(cfg),
         ));
     }
@@ -339,7 +340,6 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     }
     files
 }
-
 
 /// Doble comilla para la línea de un repo: escapa lo que rompería el shell pero
 /// deja `$SIGNED` sin tocar, porque es una variable que define el propio hook

@@ -57,8 +57,7 @@ pub fn dconf_schema_for(desktop_id: &str) -> Option<&'static str> {
 
 /// El wallpaper se aplica de verdad en GNOME-family (dconf) y Xfce (xfconf).
 pub fn wallpaper_applies(cfg: &DistroConfig) -> bool {
-    !cfg.wallpaper.is_empty()
-        && (dconf_schema_for(&cfg.desktop).is_some() || cfg.desktop == "xfce")
+    !cfg.wallpaper.is_empty() && (dconf_schema_for(&cfg.desktop).is_some() || cfg.desktop == "xfce")
 }
 
 /// Ficheros dconf (perfil + base de datos) con rutas absolutas de destino.

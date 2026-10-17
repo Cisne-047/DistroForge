@@ -25,6 +25,7 @@
 
 pub mod catalog;
 pub mod generators;
+pub mod security;
 pub mod share;
 pub mod templates;
 pub mod types;

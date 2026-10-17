@@ -1,11 +1,11 @@
 //! Tests de integración: réplica de server/tests/api.test.ts (los 8 tests).
 
 use axum::body::Body;
-use axum::http::{Method, Request, StatusCode, header};
+use axum::http::{header, Method, Request, StatusCode};
 use axum::response::Response;
 use axum::Router;
 use http_body_util::BodyExt;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tower::ServiceExt;
 
 use distroforge_server::{build_router, db::open_db};
@@ -88,14 +88,7 @@ async fn registra_loguea_y_devuelve_usuario_actual() {
     // también vale Authorization: Bearer <token>
     let login = body_json(r).await;
     let token = login["token"].as_str().expect("token");
-    let me = send(
-        &app,
-        Method::GET,
-        "/api/me",
-        None,
-        None,
-    )
-    .await;
+    let me = send(&app, Method::GET, "/api/me", None, None).await;
     // (sin credenciales: null)
     assert_eq!(body_json(me).await["user"], Value::Null);
     let req = Request::builder()
@@ -188,14 +181,16 @@ async fn publica_packs_auth_y_los_busca_por_texto() {
     let app = app();
     let cookie = login_cookie(&app).await;
 
-    let mk = |name: &str, desc: &str, packages: Value| {
-        json!({ "name": name, "desc": desc, "json": { "name": name, "packages": packages } })
-    };
+    let mk = |name: &str, desc: &str, packages: Value| json!({ "name": name, "desc": desc, "json": { "name": name, "packages": packages } });
     let gaming = send(
         &app,
         Method::POST,
         "/api/packs",
-        Some(mk("Gaming total", "steam y lutris", json!(["steam", "lutris"]))),
+        Some(mk(
+            "Gaming total",
+            "steam y lutris",
+            json!(["steam", "lutris"]),
+        )),
         Some(&cookie),
     )
     .await;
@@ -205,7 +200,11 @@ async fn publica_packs_auth_y_los_busca_por_texto() {
         &app,
         Method::POST,
         "/api/packs",
-        Some(mk("Servidor NAS", "samba y nfs", json!(["samba", "nfs-kernel-server"]))),
+        Some(mk(
+            "Servidor NAS",
+            "samba y nfs",
+            json!(["samba", "nfs-kernel-server"]),
+        )),
         Some(&cookie),
     )
     .await;
@@ -342,4 +341,74 @@ async fn sin_login_o_con_ruta_relativa_rechaza() {
     )
     .await;
     assert_eq!(relativa.status(), StatusCode::BAD_REQUEST);
+}
+
+// ---------- seguridad ----------
+
+#[tokio::test]
+async fn cabeceras_de_seguridad_en_la_api_y_sin_csp_en_vnc() {
+    let app = app();
+    let health = send(&app, Method::GET, "/api/health", None, None).await;
+    assert_eq!(health.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(health.headers()["x-frame-options"], "DENY");
+    assert!(health.headers().contains_key("content-security-policy"));
+
+    let vnc = send(&app, Method::GET, "/vnc.html", None, None).await;
+    assert_eq!(vnc.status(), StatusCode::OK);
+    assert!(!vnc.headers().contains_key("content-security-policy"));
+}
+
+#[tokio::test]
+async fn el_login_se_limita_por_fuerza_bruta() {
+    let app = app();
+    register(&app).await;
+    let mut last = StatusCode::OK;
+    for _ in 0..12 {
+        let r = send(
+            &app,
+            Method::POST,
+            "/api/login",
+            Some(json!({ "name": "tester", "password": "incorrecta" })),
+            None,
+        )
+        .await;
+        last = r.status();
+    }
+    assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn cerrar_sesion_ajena_exige_login_y_dueno() {
+    let app = app();
+    let sin_login = send(&app, Method::DELETE, "/api/testdrive/abc", None, None).await;
+    assert_eq!(sin_login.status(), StatusCode::UNAUTHORIZED);
+
+    let reg = register(&app).await;
+    let cookie = df_session(&reg).expect("cookie");
+    let ajena = send(
+        &app,
+        Method::DELETE,
+        "/api/testdrive/abc",
+        None,
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(ajena.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn packs_demasiado_grandes_se_rechazan() {
+    let app = app();
+    let reg = register(&app).await;
+    let cookie = df_session(&reg).expect("cookie");
+    let grande = "a".repeat(300 * 1024);
+    let r = send(
+        &app,
+        Method::POST,
+        "/api/packs",
+        Some(json!({ "name": "p", "desc": "", "json": { "packages": [], "x": grande } })),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }

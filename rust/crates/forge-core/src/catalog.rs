@@ -6,7 +6,7 @@
 //! TS lanza en `baseById` con ids desconocidos; en Rust ese estado no existe).
 
 use crate::types::{
-    BaseId, CustomRepo, DistroConfig, GrubConfig, NetworkConfig, NetMode, OutputFormat,
+    BaseId, CustomRepo, DistroConfig, GrubConfig, NetMode, NetworkConfig, OutputFormat,
     PartialConfig, SystemConfig,
 };
 
@@ -105,130 +105,466 @@ const SUSE_SUGGESTIONS: [&str; 19] = [
 ];
 
 static SUSE_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["pattern:kde", "sddm"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["pattern:gnome", "gdm"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["pattern:xfce", "lightdm"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["pattern:mate", "lightdm"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["pattern:lxqt", "sddm"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["pattern:cinnamon", "lightdm"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["pattern:budgie", "lightdm"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["i3", "lightdm"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["sway"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["pattern:kde", "sddm"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["pattern:gnome", "gdm"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["pattern:xfce", "lightdm"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["pattern:mate", "lightdm"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["pattern:lxqt", "sddm"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["pattern:cinnamon", "lightdm"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["pattern:budgie", "lightdm"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "lightdm"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["sway"],
+    },
 ];
 
 static DEBIAN_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["task-gnome-desktop", "gdm3"] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["task-kde-desktop", "sddm"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["task-xfce-desktop", "lightdm"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["task-mate-desktop", "lightdm"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["task-lxqt-desktop", "sddm"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["task-cinnamon-desktop", "lightdm"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["task-budgie-desktop", "lightdm"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["i3", "i3status", "lightdm"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["sway"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["task-gnome-desktop", "gdm3"],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["task-kde-desktop", "sddm"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["task-xfce-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["task-mate-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["task-lxqt-desktop", "sddm"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["task-cinnamon-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["task-budgie-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "i3status", "lightdm"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["sway"],
+    },
 ];
 
 static UBUNTU_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["ubuntu-desktop"] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["kubuntu-desktop"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["xubuntu-desktop"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["ubuntu-mate-desktop"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["lubuntu-desktop"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["cinnamon-desktop-environment"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["ubuntu-budgie-desktop"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["i3", "i3status"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["sway"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["ubuntu-desktop"],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["kubuntu-desktop"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["xubuntu-desktop"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["ubuntu-mate-desktop"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["lubuntu-desktop"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["cinnamon-desktop-environment"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["ubuntu-budgie-desktop"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "i3status"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["sway"],
+    },
 ];
 
 static MINT_DESKTOPS: [DesktopDef; 4] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["cinnamon", "mint-meta-cinnamon"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["mint-meta-mate"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["mint-meta-xfce"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["cinnamon", "mint-meta-cinnamon"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["mint-meta-mate"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["mint-meta-xfce"],
+    },
 ];
 
 static ARCH_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["plasma-meta", "sddm"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["gnome", "gdm"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["xfce4", "xfce4-goodies", "lightdm"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["mate", "lightdm"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["lxqt", "sddm"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["cinnamon", "lightdm"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["budgie-desktop", "lightdm"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["i3", "i3status"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["sway"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["plasma-meta", "sddm"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["gnome", "gdm"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["xfce4", "xfce4-goodies", "lightdm"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["mate", "lightdm"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["lxqt", "sddm"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["cinnamon", "lightdm"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["budgie-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "i3status"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["sway"],
+    },
 ];
 
 // CachyOS = ARCH_DESKTOPS con "cachyos-settings" en "none" y
 // "cachyos-kde-settings" añadido a KDE (map del TS).
 static CACHYOS_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &["cachyos-settings"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &["cachyos-settings"],
+    },
     DesktopDef {
         id: "kde",
         label: "KDE Plasma",
         packages: &["plasma-meta", "sddm", "cachyos-kde-settings"],
     },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["gnome", "gdm"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["xfce4", "xfce4-goodies", "lightdm"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["mate", "lightdm"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["lxqt", "sddm"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["cinnamon", "lightdm"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["budgie-desktop", "lightdm"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["i3", "i3status"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["sway"] },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["gnome", "gdm"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["xfce4", "xfce4-goodies", "lightdm"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["mate", "lightdm"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["lxqt", "sddm"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["cinnamon", "lightdm"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["budgie-desktop", "lightdm"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "i3status"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["sway"],
+    },
 ];
 
 static FEDORA_DESKTOPS: [DesktopDef; 10] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["@^kde-desktop-environment"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["@^gnome-desktop-environment"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["@^xfce-desktop-environment"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["@mate-desktop-environment"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["@lxqt-desktop-environment"] },
-    DesktopDef { id: "cinnamon", label: "Cinnamon", packages: &["@cinnamon-desktop-environment"] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["@budgie-desktop-environment"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["@i3-desktop-environment"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["@sway-desktop-environment"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["@^kde-desktop-environment"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["@^gnome-desktop-environment"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["@^xfce-desktop-environment"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["@mate-desktop-environment"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["@lxqt-desktop-environment"],
+    },
+    DesktopDef {
+        id: "cinnamon",
+        label: "Cinnamon",
+        packages: &["@cinnamon-desktop-environment"],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["@budgie-desktop-environment"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["@i3-desktop-environment"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["@sway-desktop-environment"],
+    },
 ];
 
 static GENTOO_DESKTOPS: [DesktopDef; 8] = [
-    DesktopDef { id: "none", label: "Sin escritorio", packages: &[] },
-    DesktopDef { id: "kde", label: "KDE Plasma", packages: &["kde-plasma/plasma-meta"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["gnome-base/gnome"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["xfce-base/xfce4"] },
-    DesktopDef { id: "mate", label: "MATE", packages: &["mate-base/mate"] },
-    DesktopDef { id: "lxqt", label: "LXQt", packages: &["lxqt-base/lxqt-meta"] },
-    DesktopDef { id: "i3", label: "i3 (tiling WM)", packages: &["x11-wm/i3"] },
-    DesktopDef { id: "sway", label: "Sway (Wayland WM)", packages: &["gui-wm/sway"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["kde-plasma/plasma-meta"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["gnome-base/gnome"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["xfce-base/xfce4"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["mate-base/mate"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["lxqt-base/lxqt-meta"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["x11-wm/i3"],
+    },
+    DesktopDef {
+        id: "sway",
+        label: "Sway (Wayland WM)",
+        packages: &["gui-wm/sway"],
+    },
 ];
 
 static ELEMENTARY_DESKTOPS: [DesktopDef; 3] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "pantheon", label: "Pantheon", packages: &["elementary-desktop"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["ubuntu-desktop"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "pantheon",
+        label: "Pantheon",
+        packages: &["elementary-desktop"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["ubuntu-desktop"],
+    },
 ];
 
 static POP_DESKTOPS: [DesktopDef; 3] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "popgnome", label: "Pop! GNOME", packages: &["pop-desktop"] },
-    DesktopDef { id: "cosmic", label: "COSMIC", packages: &["cosmic-desktop"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "popgnome",
+        label: "Pop! GNOME",
+        packages: &["pop-desktop"],
+    },
+    DesktopDef {
+        id: "cosmic",
+        label: "COSMIC",
+        packages: &["cosmic-desktop"],
+    },
 ];
 
 static ZORIN_DESKTOPS: [DesktopDef; 3] = [
-    DesktopDef { id: "none", label: "Sin escritorio (servidor)", packages: &[] },
-    DesktopDef { id: "zorincore", label: "Zorin Core (GNOME)", packages: &["zorin-os-desktop"] },
-    DesktopDef { id: "gnome", label: "GNOME estándar", packages: &["ubuntu-desktop"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "zorincore",
+        label: "Zorin Core (GNOME)",
+        packages: &["zorin-os-desktop"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME estándar",
+        packages: &["ubuntu-desktop"],
+    },
 ];
 
 static SOLUS_DESKTOPS: [DesktopDef; 4] = [
-    DesktopDef { id: "none", label: "Sin escritorio", packages: &[] },
-    DesktopDef { id: "budgie", label: "Budgie", packages: &["budgie-desktop"] },
-    DesktopDef { id: "gnome", label: "GNOME", packages: &["gnome"] },
-    DesktopDef { id: "xfce", label: "Xfce", packages: &["xfce4-session"] },
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "budgie",
+        label: "Budgie",
+        packages: &["budgie-desktop"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["gnome"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["xfce4-session"],
+    },
 ];
 
 static MINT_PRESET_REPOS: [PresetRepo; 1] = [PresetRepo {
@@ -683,7 +1019,8 @@ fn preset_to_custom(p: &PresetRepo) -> CustomRepo {
 
 /// ¿Es `alias` un alias preset de alguna base?
 fn is_preset_alias(alias: &str) -> bool {
-    BASES.iter()
+    BASES
+        .iter()
         .flat_map(|b| b.preset_repos.iter())
         .any(|p| p.alias == alias)
 }
@@ -712,27 +1049,26 @@ pub fn merge_presets(next_base: &BaseDef, repos: &[CustomRepo]) -> Vec<CustomRep
 /// los desactivó) + repos del usuario. Los generadores usan esto, no
 /// `cfg.repos` a pelo. Port de `effectiveRepos`.
 pub fn effective_repos(cfg: &DistroConfig) -> Vec<CustomRepo> {
+    use std::collections::HashSet;
     let base = base_by_id(cfg.base);
     let presets = base.preset_repos;
-    let user_repos: Vec<&CustomRepo> = cfg
-        .repos
-        .iter()
-        .filter(|r| {
-            !presets.iter().any(|p| p.alias == r.alias) && r.enabled && !r.url.is_empty()
-        })
-        .collect();
-    let disabled_presets: Vec<&str> = cfg
-        .repos
-        .iter()
-        .filter(|r| presets.iter().any(|p| p.alias == r.alias) && !r.enabled)
-        .map(|r| r.alias.as_str())
-        .collect();
+    // O(P+U) con conjuntos en vez del O(P·U) de `contains` sobre vectores.
+    let preset_aliases: HashSet<&str> = presets.iter().map(|p| p.alias).collect();
+    let mut disabled: HashSet<&str> = HashSet::new();
+    let mut user_repos: Vec<&CustomRepo> = Vec::new();
+    for r in &cfg.repos {
+        if preset_aliases.contains(r.alias.as_str()) {
+            if !r.enabled {
+                disabled.insert(r.alias.as_str());
+            }
+        } else if r.enabled && !r.url.is_empty() {
+            user_repos.push(r);
+        }
+    }
+    let user_aliases: HashSet<&str> = user_repos.iter().map(|r| r.alias.as_str()).collect();
     let mut out: Vec<CustomRepo> = presets
         .iter()
-        .filter(|p| {
-            !disabled_presets.contains(&p.alias)
-                && !user_repos.iter().any(|r| r.alias == p.alias)
-        })
+        .filter(|p| !disabled.contains(p.alias) && !user_aliases.contains(p.alias))
         .map(preset_to_custom)
         .collect();
     out.extend(user_repos.into_iter().cloned());
@@ -836,57 +1172,143 @@ pub fn default_config(base: BaseId) -> DistroConfig {
 pub fn merge_config(base: BaseId, parsed: PartialConfig) -> DistroConfig {
     let mut d = default_config(base);
     let p = parsed;
-    if let Some(v) = p.name { d.name = v; }
-    if let Some(v) = p.base { d.base = v; }
-    if let Some(v) = p.desktop { d.desktop = v; }
-    if let Some(v) = p.packages { d.packages = v; }
-    if let Some(v) = p.repos { d.repos = v; }
-    if let Some(s) = p.system {
-        if let Some(v) = s.hostname { d.system.hostname = v; }
-        if let Some(v) = s.username { d.system.username = v; }
-        if let Some(v) = s.password { d.system.password = v; }
-        if let Some(v) = s.timezone { d.system.timezone = v; }
-        if let Some(v) = s.locale { d.system.locale = v; }
-        if let Some(v) = s.keyboard { d.system.keyboard = v; }
+    if let Some(v) = p.name {
+        d.name = v;
     }
-    if let Some(v) = p.output { d.output = v; }
-    if let Some(v) = p.flatpak_apps { d.flatpak_apps = v; }
-    if let Some(v) = p.extra_files { d.extra_files = v; }
-    if let Some(v) = p.users { d.users = v; }
-    if let Some(v) = p.services { d.services = v; }
+    if let Some(v) = p.base {
+        d.base = v;
+    }
+    if let Some(v) = p.desktop {
+        d.desktop = v;
+    }
+    if let Some(v) = p.packages {
+        d.packages = v;
+    }
+    if let Some(v) = p.repos {
+        d.repos = v;
+    }
+    if let Some(s) = p.system {
+        if let Some(v) = s.hostname {
+            d.system.hostname = v;
+        }
+        if let Some(v) = s.username {
+            d.system.username = v;
+        }
+        if let Some(v) = s.password {
+            d.system.password = v;
+        }
+        if let Some(v) = s.timezone {
+            d.system.timezone = v;
+        }
+        if let Some(v) = s.locale {
+            d.system.locale = v;
+        }
+        if let Some(v) = s.keyboard {
+            d.system.keyboard = v;
+        }
+    }
+    if let Some(v) = p.output {
+        d.output = v;
+    }
+    if let Some(v) = p.flatpak_apps {
+        d.flatpak_apps = v;
+    }
+    if let Some(v) = p.extra_files {
+        d.extra_files = v;
+    }
+    if let Some(v) = p.users {
+        d.users = v;
+    }
+    if let Some(v) = p.services {
+        d.services = v;
+    }
     if let Some(n) = p.network {
-        if let Some(v) = n.mode { d.network.mode = v; }
-        if let Some(v) = n.ip { d.network.ip = v; }
-        if let Some(v) = n.prefix { d.network.prefix = v; }
-        if let Some(v) = n.gateway { d.network.gateway = v; }
-        if let Some(v) = n.dns { d.network.dns = v; }
+        if let Some(v) = n.mode {
+            d.network.mode = v;
+        }
+        if let Some(v) = n.ip {
+            d.network.ip = v;
+        }
+        if let Some(v) = n.prefix {
+            d.network.prefix = v;
+        }
+        if let Some(v) = n.gateway {
+            d.network.gateway = v;
+        }
+        if let Some(v) = n.dns {
+            d.network.dns = v;
+        }
     }
     if let Some(g) = p.grub {
-        if let Some(v) = g.timeout { d.grub.timeout = v; }
-        if let Some(v) = g.extra_params { d.grub.extra_params = v; }
+        if let Some(v) = g.timeout {
+            d.grub.timeout = v;
+        }
+        if let Some(v) = g.extra_params {
+            d.grub.extra_params = v;
+        }
     }
-    if let Some(v) = p.firewall { d.firewall = v; }
-    if let Some(v) = p.arch { d.arch = v; }
-    if let Some(v) = p.advanced { d.advanced = v; }
+    if let Some(v) = p.firewall {
+        d.firewall = v;
+    }
+    if let Some(v) = p.arch {
+        d.arch = v;
+    }
+    if let Some(v) = p.advanced {
+        d.advanced = v;
+    }
     if let Some(c) = p.custom_iso {
-        if let Some(v) = c.url { d.custom_iso.url = v; }
-        if let Some(v) = c.chroot_script { d.custom_iso.chroot_script = v; }
+        if let Some(v) = c.url {
+            d.custom_iso.url = v;
+        }
+        if let Some(v) = c.chroot_script {
+            d.custom_iso.chroot_script = v;
+        }
     }
-    if let Some(v) = p.autologin { d.autologin = v; }
-    if let Some(v) = p.autostart { d.autostart = v; }
-    if let Some(v) = p.firewall_ports { d.firewall_ports = v; }
-    if let Some(v) = p.boot_target { d.boot_target = v; }
-    if let Some(v) = p.logo { d.logo = v; }
-    if let Some(v) = p.start_icon { d.start_icon = v; }
-    if let Some(v) = p.eula_text { d.eula_text = v; }
-    if let Some(v) = p.unattended { d.unattended = v; }
-    if let Some(v) = p.smoke_test { d.smoke_test = v; }
-    if let Some(v) = p.sign_image { d.sign_image = v; }
-    if let Some(v) = p.test_drive { d.test_drive = v; }
-    if let Some(v) = p.cloud_upload { d.cloud_upload = v; }
-    if let Some(v) = p.cloud_init { d.cloud_init = v; }
-    if let Some(v) = p.motd { d.motd = v; }
-    if let Some(v) = p.wallpaper { d.wallpaper = v; }
+    if let Some(v) = p.autologin {
+        d.autologin = v;
+    }
+    if let Some(v) = p.autostart {
+        d.autostart = v;
+    }
+    if let Some(v) = p.firewall_ports {
+        d.firewall_ports = v;
+    }
+    if let Some(v) = p.boot_target {
+        d.boot_target = v;
+    }
+    if let Some(v) = p.logo {
+        d.logo = v;
+    }
+    if let Some(v) = p.start_icon {
+        d.start_icon = v;
+    }
+    if let Some(v) = p.eula_text {
+        d.eula_text = v;
+    }
+    if let Some(v) = p.unattended {
+        d.unattended = v;
+    }
+    if let Some(v) = p.smoke_test {
+        d.smoke_test = v;
+    }
+    if let Some(v) = p.sign_image {
+        d.sign_image = v;
+    }
+    if let Some(v) = p.test_drive {
+        d.test_drive = v;
+    }
+    if let Some(v) = p.cloud_upload {
+        d.cloud_upload = v;
+    }
+    if let Some(v) = p.cloud_init {
+        d.cloud_init = v;
+    }
+    if let Some(v) = p.motd {
+        d.motd = v;
+    }
+    if let Some(v) = p.wallpaper {
+        d.wallpaper = v;
+    }
     d
 }
 
@@ -896,55 +1318,141 @@ pub fn merge_config(base: BaseId, parsed: PartialConfig) -> DistroConfig {
 /// trae nada (el TS inyectaría `undefined`; aquí se mantiene el default, que
 /// es lo único razonable con tipos concretos).
 pub fn assign_partial(cfg: &mut DistroConfig, p: PartialConfig) {
-    if let Some(v) = p.name { cfg.name = v; }
-    if let Some(v) = p.base { cfg.base = v; }
-    if let Some(v) = p.desktop { cfg.desktop = v; }
-    if let Some(v) = p.packages { cfg.packages = v; }
-    if let Some(v) = p.repos { cfg.repos = v; }
-    if let Some(s) = p.system {
-        if let Some(v) = s.hostname { cfg.system.hostname = v; }
-        if let Some(v) = s.username { cfg.system.username = v; }
-        if let Some(v) = s.password { cfg.system.password = v; }
-        if let Some(v) = s.timezone { cfg.system.timezone = v; }
-        if let Some(v) = s.locale { cfg.system.locale = v; }
-        if let Some(v) = s.keyboard { cfg.system.keyboard = v; }
+    if let Some(v) = p.name {
+        cfg.name = v;
     }
-    if let Some(v) = p.output { cfg.output = v; }
-    if let Some(v) = p.flatpak_apps { cfg.flatpak_apps = v; }
-    if let Some(v) = p.extra_files { cfg.extra_files = v; }
-    if let Some(v) = p.users { cfg.users = v; }
-    if let Some(v) = p.services { cfg.services = v; }
+    if let Some(v) = p.base {
+        cfg.base = v;
+    }
+    if let Some(v) = p.desktop {
+        cfg.desktop = v;
+    }
+    if let Some(v) = p.packages {
+        cfg.packages = v;
+    }
+    if let Some(v) = p.repos {
+        cfg.repos = v;
+    }
+    if let Some(s) = p.system {
+        if let Some(v) = s.hostname {
+            cfg.system.hostname = v;
+        }
+        if let Some(v) = s.username {
+            cfg.system.username = v;
+        }
+        if let Some(v) = s.password {
+            cfg.system.password = v;
+        }
+        if let Some(v) = s.timezone {
+            cfg.system.timezone = v;
+        }
+        if let Some(v) = s.locale {
+            cfg.system.locale = v;
+        }
+        if let Some(v) = s.keyboard {
+            cfg.system.keyboard = v;
+        }
+    }
+    if let Some(v) = p.output {
+        cfg.output = v;
+    }
+    if let Some(v) = p.flatpak_apps {
+        cfg.flatpak_apps = v;
+    }
+    if let Some(v) = p.extra_files {
+        cfg.extra_files = v;
+    }
+    if let Some(v) = p.users {
+        cfg.users = v;
+    }
+    if let Some(v) = p.services {
+        cfg.services = v;
+    }
     if let Some(n) = p.network {
-        if let Some(v) = n.mode { cfg.network.mode = v; }
-        if let Some(v) = n.ip { cfg.network.ip = v; }
-        if let Some(v) = n.prefix { cfg.network.prefix = v; }
-        if let Some(v) = n.gateway { cfg.network.gateway = v; }
-        if let Some(v) = n.dns { cfg.network.dns = v; }
+        if let Some(v) = n.mode {
+            cfg.network.mode = v;
+        }
+        if let Some(v) = n.ip {
+            cfg.network.ip = v;
+        }
+        if let Some(v) = n.prefix {
+            cfg.network.prefix = v;
+        }
+        if let Some(v) = n.gateway {
+            cfg.network.gateway = v;
+        }
+        if let Some(v) = n.dns {
+            cfg.network.dns = v;
+        }
     }
     if let Some(g) = p.grub {
-        if let Some(v) = g.timeout { cfg.grub.timeout = v; }
-        if let Some(v) = g.extra_params { cfg.grub.extra_params = v; }
+        if let Some(v) = g.timeout {
+            cfg.grub.timeout = v;
+        }
+        if let Some(v) = g.extra_params {
+            cfg.grub.extra_params = v;
+        }
     }
-    if let Some(v) = p.firewall { cfg.firewall = v; }
-    if let Some(v) = p.arch { cfg.arch = v; }
-    if let Some(v) = p.advanced { cfg.advanced = v; }
+    if let Some(v) = p.firewall {
+        cfg.firewall = v;
+    }
+    if let Some(v) = p.arch {
+        cfg.arch = v;
+    }
+    if let Some(v) = p.advanced {
+        cfg.advanced = v;
+    }
     if let Some(c) = p.custom_iso {
-        if let Some(v) = c.url { cfg.custom_iso.url = v; }
-        if let Some(v) = c.chroot_script { cfg.custom_iso.chroot_script = v; }
+        if let Some(v) = c.url {
+            cfg.custom_iso.url = v;
+        }
+        if let Some(v) = c.chroot_script {
+            cfg.custom_iso.chroot_script = v;
+        }
     }
-    if let Some(v) = p.autologin { cfg.autologin = v; }
-    if let Some(v) = p.autostart { cfg.autostart = v; }
-    if let Some(v) = p.firewall_ports { cfg.firewall_ports = v; }
-    if let Some(v) = p.boot_target { cfg.boot_target = v; }
-    if let Some(v) = p.logo { cfg.logo = v; }
-    if let Some(v) = p.start_icon { cfg.start_icon = v; }
-    if let Some(v) = p.eula_text { cfg.eula_text = v; }
-    if let Some(v) = p.unattended { cfg.unattended = v; }
-    if let Some(v) = p.smoke_test { cfg.smoke_test = v; }
-    if let Some(v) = p.sign_image { cfg.sign_image = v; }
-    if let Some(v) = p.test_drive { cfg.test_drive = v; }
-    if let Some(v) = p.cloud_upload { cfg.cloud_upload = v; }
-    if let Some(v) = p.cloud_init { cfg.cloud_init = v; }
-    if let Some(v) = p.motd { cfg.motd = v; }
-    if let Some(v) = p.wallpaper { cfg.wallpaper = v; }
+    if let Some(v) = p.autologin {
+        cfg.autologin = v;
+    }
+    if let Some(v) = p.autostart {
+        cfg.autostart = v;
+    }
+    if let Some(v) = p.firewall_ports {
+        cfg.firewall_ports = v;
+    }
+    if let Some(v) = p.boot_target {
+        cfg.boot_target = v;
+    }
+    if let Some(v) = p.logo {
+        cfg.logo = v;
+    }
+    if let Some(v) = p.start_icon {
+        cfg.start_icon = v;
+    }
+    if let Some(v) = p.eula_text {
+        cfg.eula_text = v;
+    }
+    if let Some(v) = p.unattended {
+        cfg.unattended = v;
+    }
+    if let Some(v) = p.smoke_test {
+        cfg.smoke_test = v;
+    }
+    if let Some(v) = p.sign_image {
+        cfg.sign_image = v;
+    }
+    if let Some(v) = p.test_drive {
+        cfg.test_drive = v;
+    }
+    if let Some(v) = p.cloud_upload {
+        cfg.cloud_upload = v;
+    }
+    if let Some(v) = p.cloud_init {
+        cfg.cloud_init = v;
+    }
+    if let Some(v) = p.motd {
+        cfg.motd = v;
+    }
+    if let Some(v) = p.wallpaper {
+        cfg.wallpaper = v;
+    }
 }

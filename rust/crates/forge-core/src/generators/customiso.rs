@@ -3,9 +3,9 @@
 
 use crate::catalog::base_by_id;
 use crate::generators::accounts::{
-    autologin_files, extra_user_shell_lines, firewall_service_line, service_shell_lines,
-    AdminGroup,
+    autologin_files, extra_user_shell_lines, firewall_service_line, service_shell_lines, AdminGroup,
 };
+use crate::generators::shell::dq;
 use crate::types::{DistroConfig, EngineId};
 
 /// Familia de paquetería de la ISO base, deducida del motor de la base elegida.
@@ -31,12 +31,6 @@ fn slice28(s: &str) -> String {
     s.chars().take(28).collect()
 }
 
-fn heredoc(path: &str, content: &str) -> String {
-    format!(
-        "mkdir -p \"$(dirname \"{path}\")\"\ncat > \"{path}\" <<'DFEOF'\n{content}\nDFEOF"
-    )
-}
-
 /// Script que corre DENTRO del chroot de la ISO remasterizada.
 pub fn chroot_script(cfg: &DistroConfig) -> String {
     let sys = &cfg.system;
@@ -49,34 +43,34 @@ pub fn chroot_script(cfg: &DistroConfig) -> String {
         "# DistroForge - chroot de la ISO remasterizada (avanzado)".to_string(),
     ];
     if ptype != "none" {
-        lines.push(format!("echo \"{}\" > /etc/hostname", sys.hostname));
+        lines.push(format!("echo \"{}\" > /etc/hostname", dq(&sys.hostname)));
         lines.push(format!(
             "ln -sf /usr/share/zoneinfo/{} /etc/localtime",
-            sys.timezone
+            dq(&sys.timezone)
         ));
     }
     if ptype == "deb" || ptype == "rpm" || ptype == "pacman" {
         lines.push(format!(
             "id \"{}\" >/dev/null 2>&1 || useradd -m -s /bin/bash -G {} \"{}\"",
-            sys.username,
+            dq(&sys.username),
             group.as_str(),
-            sys.username
+            dq(&sys.username)
         ));
         lines.push(format!(
             "echo \"{}:{}\" | chpasswd",
-            sys.username,
-            sys.password.replace('"', "\\\"")
+            dq(&sys.username),
+            dq(&sys.password)
         ));
         lines.extend(extra_user_shell_lines(cfg, group));
     }
     if !cfg.motd.is_empty() {
-        lines.push(heredoc("/etc/motd", &cfg.motd));
+        lines.push(crate::security::heredoc_write("/etc/motd", &cfg.motd));
     }
     for f in &cfg.extra_files {
-        lines.push(heredoc(&f.path, &f.content));
+        lines.push(crate::security::heredoc_write(&f.path, &f.content));
     }
     for (p, c) in autologin_files(cfg) {
-        lines.push(heredoc(&p, &c));
+        lines.push(crate::security::heredoc_write(&p, &c));
     }
     lines.push(firewall_service_line(cfg));
     lines.extend(service_shell_lines(cfg));
@@ -87,7 +81,7 @@ pub fn chroot_script(cfg: &DistroConfig) -> String {
             crate::types::js_num(cfg.grub.timeout)
         ));
         if !cfg.grub.extra_params.trim().is_empty() {
-            let cleaned = cfg.grub.extra_params.replace(['"', '`', '\\'], "");
+            let cleaned = cfg.grub.extra_params.replace(['"', '`', '\\', '$'], "");
             lines.push(format!(
                 "  sed -i \"s/^GRUB_CMDLINE_LINUX=\\\".*\\\"/GRUB_CMDLINE_LINUX=\\\"{cleaned}\\\"/\" /etc/default/grub || true"
             ));
@@ -109,7 +103,7 @@ pub fn custom_iso_files(cfg: &DistroConfig) -> Vec<(String, String)> {
 
     let download = format!(
         "#!/usr/bin/env bash\nset -euo pipefail\n# DistroForge - descarga de la ISO base\nmkdir -p out\nwget -c \"{}\" -O base.iso\necho \"ISO base descargada: base.iso\"\n",
-        cfg.custom_iso.url
+        dq(&cfg.custom_iso.url)
     );
 
     // El script de remaster contiene `${...}` literal de shell; se usan tokens

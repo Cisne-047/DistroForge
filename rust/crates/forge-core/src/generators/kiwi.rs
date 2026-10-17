@@ -12,6 +12,7 @@ use crate::generators::branding::{
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines, has_flatpak_apps};
 use crate::generators::network::{nm_connection, static_network};
+use crate::generators::shell::dq;
 use crate::types::{js_num, DistroConfig, OutputFormat};
 
 /// Escapa entidades XML básicas, igual que el TS (no escapa comilla simple).
@@ -138,8 +139,7 @@ pub fn kiwi_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     let mut net_file: Vec<(String, String)> = Vec::new();
     if let Some(n) = net {
         net_file.push((
-            "kiwi/root/etc/NetworkManager/system-connections/distroforge.nmconnection"
-                .to_string(),
+            "kiwi/root/etc/NetworkManager/system-connections/distroforge.nmconnection".to_string(),
             nm_connection(n),
         ));
     }
@@ -151,38 +151,45 @@ pub fn kiwi_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         target_shell_line(cfg),
         format!(
             "echo \"{} ALL=(ALL) ALL\" > /etc/sudoers.d/50-{}",
-            sys.username, sys.username
+            dq(&sys.username),
+            dq(&sys.username)
         ),
     ];
     // las keys de repos custom entran al keyring antes de que zypper las verifique
     for r in effective_repos(cfg) {
         if !r.gpg_key.is_empty() {
-            sh_lines.push(format!("rpm --import \"{}\"", r.gpg_key));
+            sh_lines.push(format!("rpm --import \"{}\"", dq(&r.gpg_key)));
         }
     }
     sh_lines.push(firewall_service_line(cfg));
     sh_lines.extend(firewall_open_lines(cfg));
     sh_lines.extend(service_shell_lines(cfg));
     if !cfg.motd.is_empty() {
-        sh_lines.push("cat > /etc/motd <<'MOTDEOF'".to_string());
+        let marker = crate::security::heredoc_marker("MOTDEOF", &cfg.motd);
+        sh_lines.push(format!("cat > /etc/motd <<'{marker}'"));
         sh_lines.push(cfg.motd.clone());
-        sh_lines.push("MOTDEOF".to_string());
+        sh_lines.push(marker);
     }
     if has_flatpak_apps(cfg) {
         sh_lines.extend(flatpak_shell_lines(cfg, ""));
     }
     if cfg.cloud_init {
+        let yaml = cloud_init_yaml(cfg);
+        let marker = crate::security::heredoc_marker("CIEOF", &yaml);
         sh_lines.push("mkdir -p /etc/cloud/cloud.cfg.d".to_string());
-        sh_lines.push("cat > /etc/cloud/cloud.cfg.d/80-distroforge.cfg <<'CIEOF'".to_string());
-        sh_lines.push(cloud_init_yaml(cfg));
-        sh_lines.push("CIEOF".to_string());
+        sh_lines.push(format!(
+            "cat > /etc/cloud/cloud.cfg.d/80-distroforge.cfg <<'{marker}'"
+        ));
+        sh_lines.push(yaml);
+        sh_lines.push(marker);
     }
     if wallpaper_applies(cfg) && dconf_schema_for(&cfg.desktop).is_some() {
         sh_lines.push("dconf update || true".to_string());
     }
     if net.is_some() {
-        sh_lines
-            .push("chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection".to_string());
+        sh_lines.push(
+            "chmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection".to_string(),
+        );
     }
     let config_sh = format!("{}\n", sh_lines.join("\n"));
 
@@ -233,9 +240,9 @@ pub fn kiwi_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             "kiwi/autoinst.xml".to_string(),
             format!(
                 "<?xml version=\"1.0\"?>\n<profile xmlns=\"http://www.suse.com/1.0/yast2ns\" xmlns:config=\"http://www.suse.com/1.0/configns\">\n  <general><mode><confirm config:type=\"boolean\">false</confirm></mode></general>\n  <language><language>{l}</language></language>\n  <keyboard><keymap>{k}</keymap></keyboard>\n  <timezone><hwclock>UTC</hwclock><timezone>{tz}</timezone></timezone>\n  <networking><keep_network config:type=\"boolean\">true</keep_network></networking>\n  <users config:type=\"list\">\n    <user><username>{u}</username><password>{p}</password><encrypt_password config:type=\"boolean\">false</encrypt_password><home>/home/{u}</home></user>\n  </users>\n</profile>\n",
-                l = sys.locale,
-                k = sys.keyboard,
-                tz = sys.timezone,
+                l = esc(&sys.locale),
+                k = esc(&sys.keyboard),
+                tz = esc(&sys.timezone),
                 u = esc(&sys.username),
                 p = esc(&sys.password)
             ),

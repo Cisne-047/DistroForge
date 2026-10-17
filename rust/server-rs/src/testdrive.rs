@@ -36,7 +36,7 @@ pub struct DriveSession {
 impl DriveSession {
     /// Mata QEMU sin bloquear (kill_on_drop completa la limpieza).
     fn stop(&self) {
-        if let Some(mut child) = self.child.lock().expect("lock child").take() {
+        if let Some(mut child) = self.child.lock().unwrap_or_else(|e| e.into_inner()).take() {
             let _ = child.start_kill();
         }
     }
@@ -81,7 +81,11 @@ impl DriveManager {
 
     pub fn active_count(&self) -> usize {
         self.sweep();
-        self.0.sessions.lock().expect("lock sessions").len()
+        self.0
+            .sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .len()
     }
 
     pub fn list_for(&self, owner: &str) -> Vec<(String, i64)> {
@@ -140,14 +144,19 @@ impl DriveManager {
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_millis(500)).await;
-                let mut guard = child_cell.lock().expect("lock child");
+                let mut guard = child_cell.lock().unwrap_or_else(|e| e.into_inner());
                 match guard.as_mut() {
                     None => break, // parada manual: ya se borró la sesión
                     Some(child) => match child.try_wait() {
                         Ok(Some(_)) | Err(_) => {
                             guard.take();
                             drop(guard);
-                            manager.0.sessions.lock().expect("lock sessions").remove(&id);
+                            manager
+                                .0
+                                .sessions
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .remove(&id);
                             break;
                         }
                         Ok(None) => {}
@@ -168,7 +177,13 @@ impl DriveManager {
     }
 
     pub fn stop(&self, id: &str) -> bool {
-        let Some(session) = self.0.sessions.lock().expect("lock sessions").remove(id) else {
+        let Some(session) = self
+            .0
+            .sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(id)
+        else {
             return false;
         };
         session.stop();

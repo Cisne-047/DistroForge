@@ -118,9 +118,15 @@ pub fn service_exec_start_lines(cfg: &DistroConfig) -> Vec<String> {
         .filter(|s| valid_unit(&s.unit))
         .map(|s| {
             if s.enabled {
-                format!("ExecStart=/bin/sh -c 'systemctl enable --now \"{}\" || true'", s.unit)
+                format!(
+                    "ExecStart=/bin/sh -c 'systemctl enable --now \"{}\" || true'",
+                    s.unit
+                )
             } else {
-                format!("ExecStart=/bin/sh -c 'systemctl disable --now \"{}\" || true'", s.unit)
+                format!(
+                    "ExecStart=/bin/sh -c 'systemctl disable --now \"{}\" || true'",
+                    s.unit
+                )
             }
         })
         .collect()
@@ -184,7 +190,10 @@ pub fn eula_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     if text.is_empty() {
         return vec![];
     }
-    let heredoc = format!("cat > /etc/distroforge/EULA <<'DFEULA'\n{text}\nDFEULA");
+    // Marcador único: si el texto lleva una línea "DFEULA" no puede cerrar el
+    // heredoc y ejecutar comandos en el perfil del usuario.
+    let marker = crate::security::heredoc_marker("DFEULA", text);
+    let heredoc = format!("cat > /etc/distroforge/EULA <<'{marker}'\n{text}\n{marker}");
     vec![
         (
             "/etc/distroforge/EULA".to_string(),

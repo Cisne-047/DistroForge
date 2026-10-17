@@ -8,7 +8,7 @@
 use crate::catalog::{base_by_id, desktop_packages, effective_repos};
 use crate::generators::flatpak::{flatpak_packages, has_flatpak_apps};
 use crate::generators::livebuild::sanitize_alias;
-use crate::generators::shell::{dirname_of, sq};
+use crate::generators::shell::{dirname_of, dq, sq};
 use crate::types::{BaseId, DistroConfig, EngineId};
 
 /// Imagen base OCI para cada distro (salida "oci"). `None` = no soportada
@@ -61,8 +61,8 @@ fn extra_users_block(cfg: &DistroConfig, engine: EngineId) -> String {
             };
             format!(
                 "    id \"{}\" >/dev/null 2>&1 || useradd -m -s /bin/bash{group} \"{}\"; \\\n    echo {} | chpasswd; \\",
-                u.name,
-                u.name,
+                dq(&u.name),
+                dq(&u.name),
                 sq(&format!("{}:{}", u.name, u.password))
             )
         })
@@ -116,8 +116,10 @@ pub fn dockerfile_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     let Some(image) = base_image(cfg.base) else {
         return vec![];
     };
-    let mut pkgs: Vec<String> =
-        desktop_packages(cfg.base, &cfg.desktop).iter().map(|s| s.to_string()).collect();
+    let mut pkgs: Vec<String> = desktop_packages(cfg.base, &cfg.desktop)
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     pkgs.extend(flatpak_packages(cfg));
     pkgs.extend(cfg.packages.iter().cloned());
     let repos = effective_repos(cfg);

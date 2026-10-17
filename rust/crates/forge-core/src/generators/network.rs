@@ -37,7 +37,12 @@ pub fn static_network(cfg: &DistroConfig) -> Option<&NetworkConfig> {
 /// Máscara dotted a partir de prefijo CIDR (anaconda --netmask la quiere así).
 /// Replica `Number(prefix) || 24` (0/NaN → 24) y el clamp 8..32.
 pub fn dotted_mask(prefix: &str) -> String {
-    let p = prefix.trim().parse::<f64>().ok().filter(|v| *v != 0.0).unwrap_or(24.0);
+    let p = prefix
+        .trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| *v != 0.0)
+        .unwrap_or(24.0);
     let p = p.clamp(8.0, 32.0);
     // 0xffffffff << (32 - p), con el shift truncado a entero como en JS.
     let shift = (32.0 - p).trunc() as u32;
@@ -51,12 +56,29 @@ pub fn dotted_mask(prefix: &str) -> String {
 
 /// Keyfile de NetworkManager con la IP estática (live-build y KIWI).
 pub fn nm_connection(n: &NetworkConfig) -> String {
+    // Solo dígitos en el prefijo y DNS IPv4 válidas: el keyfile no lleva nada
+    // que pueda inyectar líneas nuevas.
+    let prefix: String = n
+        .prefix
+        .trim()
+        .chars()
+        .filter(char::is_ascii_digit)
+        .collect();
+    let prefix = if prefix.is_empty() {
+        "24".to_string()
+    } else {
+        prefix
+    };
+    let dns = n
+        .dns
+        .iter()
+        .filter(|d| is_ipv4(d))
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(";");
     format!(
-        "[connection]\nid=distroforge\ntype=ethernet\n\n[ipv4]\nmethod=manual\naddress1={}/{},{}\ndns={};\n",
-        n.ip,
-        n.prefix,
-        n.gateway,
-        n.dns.join(";")
+        "[connection]\nid=distroforge\ntype=ethernet\n\n[ipv4]\nmethod=manual\naddress1={}/{},{}\ndns={dns};\n",
+        n.ip, prefix, n.gateway
     )
 }
 

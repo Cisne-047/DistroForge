@@ -23,6 +23,10 @@ use crate::generators::branding::logo_matches;
 use crate::generators::customiso::custom_iso_files;
 use crate::generators::dockerfile::{dockerfile_files, oci_supported};
 use crate::generators::network::is_ipv4;
+use crate::security::{
+    valid_autostart, valid_extra_path, valid_grub_params, valid_keyboard, valid_locale,
+    valid_package, valid_password, valid_port, valid_suite, valid_timezone, valid_url,
+};
 use crate::types::{ArchId, CloudUpload, DistroConfig, EngineId, NetMode, OutputFormat};
 
 /// Mapa ruta → contenido del proyecto generado.
@@ -39,10 +43,12 @@ pub fn generate_project(cfg: &DistroConfig) -> FileMap {
     }
     let engine = base_by_id(cfg.base).engine;
     let shared = || -> Vec<(String, String)> {
-        let json =
-            serde_json::to_string_pretty(cfg).unwrap_or_else(|_| "null".to_string());
+        let json = serde_json::to_string_pretty(cfg).unwrap_or_else(|_| "null".to_string());
         let mut out = vec![
-            (".github/workflows/build.yml".to_string(), workflow_yaml(cfg)),
+            (
+                ".github/workflows/build.yml".to_string(),
+                workflow_yaml(cfg),
+            ),
             ("README.md".to_string(), readme_md(cfg)),
             // round-trip: el proyecto generado se reimporta en la app tal cual
             ("distroforge.json".to_string(), format!("{json}\n")),
@@ -64,22 +70,20 @@ pub fn generate_project(cfg: &DistroConfig) -> FileMap {
         }
         out
     };
-    let mut engine_files = if cfg.output == OutputFormat::Oci
-        && engine != EngineId::Manual
-        && oci_supported(cfg)
-    {
-        dockerfile_files(cfg)
-    } else if cfg.output == OutputFormat::Wsl && engine != EngineId::Manual {
-        wsl::wsl_files(cfg)
-    } else {
-        match engine {
-            EngineId::Kiwi => kiwi::kiwi_files(cfg),
-            EngineId::Livebuild => livebuild::livebuild_files(cfg),
-            EngineId::Mkarchiso => archiso::archiso_files(cfg),
-            EngineId::Kickstart => kickstart::kickstart_files(cfg),
-            EngineId::Manual => manual::manual_files(cfg),
-        }
-    };
+    let mut engine_files =
+        if cfg.output == OutputFormat::Oci && engine != EngineId::Manual && oci_supported(cfg) {
+            dockerfile_files(cfg)
+        } else if cfg.output == OutputFormat::Wsl && engine != EngineId::Manual {
+            wsl::wsl_files(cfg)
+        } else {
+            match engine {
+                EngineId::Kiwi => kiwi::kiwi_files(cfg),
+                EngineId::Livebuild => livebuild::livebuild_files(cfg),
+                EngineId::Mkarchiso => archiso::archiso_files(cfg),
+                EngineId::Kickstart => kickstart::kickstart_files(cfg),
+                EngineId::Manual => manual::manual_files(cfg),
+            }
+        };
     engine_files.extend(shared());
     engine_files.into_iter().collect()
 }
@@ -148,8 +152,12 @@ fn valid_flatpak_id(s: &str) -> bool {
 /// o default según el punto de uso); aquí solo se usa para validar el rango
 /// 8-32, replicando `Number(n.prefix) >= 8 && Number(n.prefix) <= 32`.
 fn prefix_in_range(prefix: &str) -> bool {
-    match prefix.trim().parse::<f64>() {
-        Ok(v) => (8.0..=32.0).contains(&v),
+    let t = prefix.trim();
+    if t.is_empty() || !t.bytes().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    match t.parse::<u8>() {
+        Ok(v) => (8..=32).contains(&v),
         Err(_) => false,
     }
 }
@@ -213,9 +221,51 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
     }
     if cfg.system.password.is_empty() {
         out.push("Falta la contraseña del usuario.".to_string());
+    } else if !valid_password(&cfg.system.password) {
+        out.push(
+            "Contraseña: sin saltos de línea ni caracteres de control (máx. 256).".to_string(),
+        );
+    }
+    if !valid_locale(&cfg.system.locale) {
+        out.push("Locale inválido (ej. es_ES.UTF-8).".to_string());
+    }
+    if !valid_timezone(&cfg.system.timezone) {
+        out.push("Zona horaria inválida (ej. Europe/Madrid).".to_string());
+    }
+    if !valid_keyboard(&cfg.system.keyboard) {
+        out.push("Distribución de teclado inválida (ej. es).".to_string());
+    }
+    if !valid_grub_params(&cfg.grub.extra_params) {
+        out.push("GRUB: parámetros extra inválidos (sin ; & | $ ` ni comillas).".to_string());
+    }
+    for (i, p) in cfg.packages.iter().enumerate() {
+        if !valid_package(p) {
+            out.push(format!(
+                "Paquete #{}: \"{p}\" no es un nombre válido.",
+                i + 1
+            ));
+        }
+    }
+    for (i, a) in cfg.autostart.iter().enumerate() {
+        if !valid_autostart(a) {
+            out.push(format!(
+                "Autostart #{}: programa inválido (sin saltos de línea).",
+                i + 1
+            ));
+        }
+    }
+    for (i, p) in cfg.firewall_ports.iter().enumerate() {
+        if !valid_port(p) {
+            out.push(format!(
+                "Puerto #{}: \"{p}\" no es un puerto válido (ej. 22 o 1024-2048/tcp).",
+                i + 1
+            ));
+        }
     }
     if is_disk_output(cfg.output) && engine != EngineId::Kiwi {
-        out.push("QCOW2/USB/VMDK/VDI/VHD solo disponibles con motor KIWI (bases openSUSE).".to_string());
+        out.push(
+            "QCOW2/USB/VMDK/VDI/VHD solo disponibles con motor KIWI (bases openSUSE).".to_string(),
+        );
     }
     if cfg.unattended && !matches!(engine, EngineId::Livebuild | EngineId::Kiwi) {
         out.push(
@@ -261,14 +311,14 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
         }
     }
     for (i, f) in cfg.extra_files.iter().enumerate() {
-        if f.path.is_empty() || !f.path.starts_with('/') {
+        if !f.path.starts_with('/') || f.path.is_empty() {
             out.push(format!(
                 "Fichero extra #{}: la ruta debe ser absoluta (empieza por /).",
                 i + 1
             ));
-        } else if f.path.contains("..") {
+        } else if !valid_extra_path(&f.path) {
             out.push(format!(
-                "Fichero extra #{}: la ruta no puede contener \"..\".",
+                "Fichero extra #{}: ruta no válida (sin \"..\", comillas ni caracteres de control).",
                 i + 1
             ));
         }
@@ -300,6 +350,11 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
                 u.name.clone()
             };
             out.push(format!("Usuario extra \"{who}\": falta la contraseña."));
+        } else if !valid_password(&u.password) {
+            out.push(format!(
+                "Usuario extra \"{}\": contraseña con caracteres de control.",
+                u.name
+            ));
         }
     }
     for (i, s) in cfg.services.iter().enumerate() {
@@ -386,6 +441,8 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
         let url = &cfg.custom_iso.url;
         if !is_http_url_nonempty(url) {
             out.push("Advanced: falta la URL de la ISO base (http/https).".to_string());
+        } else if !valid_url(url) {
+            out.push("Advanced: la URL de la ISO tiene caracteres no válidos.".to_string());
         } else if !ends_with_iso(url) {
             out.push("Advanced: la URL debe apuntar a un fichero .iso.".to_string());
         }
@@ -398,11 +455,20 @@ pub fn validate(cfg: &DistroConfig) -> Vec<String> {
             if !r.alias.is_empty() || !r.gpg_key.is_empty() {
                 out.push(format!("Repo #{}: falta la URL.", i + 1));
             }
-        } else if !is_http_url(&r.url) {
-            out.push(format!("Repo \"{}\": la URL debe empezar por http(s)://.", r.alias));
+        } else if !valid_url(&r.url) {
+            out.push(format!(
+                "Repo \"{}\": URL no válida (http/https, sin comillas, $ ni saltos).",
+                r.alias
+            ));
         }
-        if !r.gpg_key.is_empty() && !is_http_url(&r.gpg_key) {
-            out.push(format!("Repo \"{}\": la key GPG debe ser una URL http(s).", r.alias));
+        if !r.suite.is_empty() && !valid_suite(&r.suite) {
+            out.push(format!("Repo \"{}\": suite no válida.", r.alias));
+        }
+        if !r.gpg_key.is_empty() && !valid_url(&r.gpg_key) {
+            out.push(format!(
+                "Repo \"{}\": la key GPG debe ser una URL http(s) válida.",
+                r.alias
+            ));
         }
     }
     out
@@ -731,7 +797,11 @@ pub fn readme_md(cfg: &DistroConfig) -> String {
         } else {
             "sí (copiado a /usr/share/distroforge + greeter LightDM)"
         },
-        eula = if cfg.eula_text.is_empty() { "no" } else { "sí (primer login)" },
+        eula = if cfg.eula_text.is_empty() {
+            "no"
+        } else {
+            "sí (primer login)"
+        },
         unattended = if cfg.unattended {
             " · instalación desatendida (preseed)"
         } else {
@@ -749,7 +819,11 @@ pub fn readme_md(cfg: &DistroConfig) -> String {
         },
     );
     let repo_urls = if !repos.is_empty() {
-        repos.iter().map(|r| r.url.as_str()).collect::<Vec<_>>().join(", ")
+        repos
+            .iter()
+            .map(|r| r.url.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
     } else {
         "ninguno".to_string()
     };

@@ -18,7 +18,7 @@ use std::path::Path;
 use std::process::exit;
 
 use forge_core::catalog::{assign_partial, default_config, BASES};
-use forge_core::generators::generate_project;
+use forge_core::generators::{generate_project, validate};
 use forge_core::types::{BaseId, OutputFormat, PartialConfig};
 
 fn usage() -> ! {
@@ -85,8 +85,28 @@ fn main() {
         .cloned()
         .unwrap_or_else(|| format!("dump-{}", base.as_str()));
 
+    // Barrera de seguridad: el CLI también valida, aunque la config venga de un
+    // fichero a mano o de un pack compartido.
+    let problems = validate(&cfg);
+    if !problems.is_empty() {
+        eprintln!("Configuración no válida:");
+        for p in &problems {
+            eprintln!("  - {p}");
+        }
+        exit(2);
+    }
+
     let files = generate_project(&cfg);
     for (p, content) in &files {
+        // Ni rutas absolutas ni saltos hacia atrás fuera del directorio de salida.
+        let safe = !p.starts_with('/')
+            && !p.contains('\\')
+            && p.split('/')
+                .all(|seg| seg != ".." && seg != "." && !seg.is_empty());
+        if !safe {
+            eprintln!("Ruta no segura en el proyecto generado: {p}");
+            exit(1);
+        }
         let full = Path::new(&out).join(p);
         if let Some(parent) = full.parent() {
             if let Err(e) = fs::create_dir_all(parent) {
