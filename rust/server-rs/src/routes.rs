@@ -403,6 +403,10 @@ async fn login(
         auth::find_user(&db, name)
     };
     let Some(row) = row else {
+        // Con usuario inexistente también se paga un scrypt: el tiempo de
+        // respuesta no debe delatar si el nombre existe.
+        let pw = password.to_string();
+        let _ = tokio::task::spawn_blocking(move || auth::hash_password(&pw)).await;
         return error(StatusCode::UNAUTHORIZED, "usuario o contraseña incorrectos");
     };
     let pw = password.to_string();
@@ -629,6 +633,19 @@ fn safe_image_path(state: &AppState, raw: &str) -> Result<PathBuf, &'static str>
     let meta = std::fs::metadata(&p).map_err(|_| "no se pudo leer la imagen")?;
     if !meta.is_file() {
         return Err("imagePath debe ser un fichero regular");
+    }
+    // Tras resolver symlinks se vuelve a comprobar la extensión: un `/tmp/a.iso`
+    // que apunte a otra cosa no debe colarse como imagen.
+    let name = p
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ![".iso", ".img", ".qcow2", ".raw"]
+        .iter()
+        .any(|e| name.ends_with(e))
+    {
+        return Err("imagePath debe ser .iso, .img, .qcow2 o .raw");
     }
     if let Some(base) = state.iso_dir.as_deref() {
         if !p.starts_with(base.as_path()) {

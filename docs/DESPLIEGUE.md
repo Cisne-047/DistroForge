@@ -109,6 +109,12 @@ El orden de prioridad al resolver el servidor es:
 | `DF_DB_PATH` | `:memory:` | Ruta del SQLite. **En un despliegue real, en un volumen**: con `:memory:` las cuentas y los packs desaparecen al reiniciar |
 | `QEMU_BIN` | `qemu-system-x86_64` | Binario de QEMU para el Test Drive |
 | `DF_WEB_DIR` | — | Directorio con la interfaz web compilada; si existe, se sirve en el mismo origen que la API |
+| `DF_ISO_DIR` | — | Directorio del que el Test Drive acepta imágenes. Sin ella solo se admiten rutas absolutas existentes con extensión `.iso/.img/.qcow2/.raw` fuera de `/proc`, `/sys` y `/dev`. En un servidor público, defínela a un directorio con las ISOs |
+
+El Test Drive canonicaliza la ruta (los symlinks se resuelven antes de comprobar el
+directorio), exige un fichero regular y limita las sesiones simultáneas. La sesión
+de la API se marca `Secure` cuando la petición trae `X-Forwarded-Proto: https`, y la
+API responde con CSP estricta salvo en `/vnc.html` (noVNC se carga desde CDN).
 
 Comprobación rápida: `GET /api/health` → `{"status":"ok","service":"distroforge-server","version":"1.0.0"}`.
 
