@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: iso-build
@@ -41,7 +41,7 @@ jobs:
           # build-essential: el contenedor no trae `cc` y los build scripts de
           # proc-macro (serde) lo necesitan para enlazar.
           apt-get install -y --no-install-recommends \
-            curl ca-certificates git file build-essential pkg-config
+            curl ca-certificates git file build-essential pkg-config gh
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -149,3 +149,19 @@ jobs:
             /tmp/shots/boot.png
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Adjuntar la ISO a la release (solo al lanzar sobre un tag)
+        if: always() && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # La ISO ya está validada (El Torito, contenido y arranque en QEMU);
+          # adjuntarla a la release la hace descargable como el resto de paquetes.
+          shopt -s nullglob
+          isos=(/tmp/proj/livebuild/*.iso)
+          if [ ${#isos[@]} -eq 0 ]; then
+            echo "::warning::no hay ISO que adjuntar"
+            exit 0
+          fi
+          sha256sum "${isos[0]}" | awk '{print $1}' > "${isos[0]}.sha256"
+          gh release upload "$GITHUB_REF_NAME" "${isos[@]}" "${isos[0]}.sha256" --clobber
