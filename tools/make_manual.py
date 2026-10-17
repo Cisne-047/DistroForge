@@ -18,7 +18,7 @@ from docx.shared import Pt, RGBColor
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "DistroForge-Manual.docx"
-VERSION = "0.5"
+VERSION = "1.0"
 INK = RGBColor(0x14, 0x1C, 0x17)
 MUTED = RGBColor(0x59, 0x65, 0x5E)
 ACCENT = RGBColor(0x1F, 0x7A, 0x4C)
