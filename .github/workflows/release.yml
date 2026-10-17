@@ -231,11 +231,19 @@ jobs:
           plataformas = {}
           def firma(p):
               return open(p, encoding="utf-8").read().strip()
+          # Las firmas llegan en su propio artefacto y, al descargar con
+          # merge-multiple, pueden quedar en otra carpeta que el paquete (el
+          # AppImage en dist/appimage/ y su .sig en dist/). Por eso se indexan por
+          # nombre y no se buscan al lado, que es lo que dejó el manifiesto de la
+          # 1.0.0 sin la entrada de Linux.
+          firmas = {os.path.basename(p): p for p in glob.glob("dist/**/*.sig", recursive=True)}
           for pat, clave in (("dist/**/*-setup.exe", "windows-x86_64"), ("dist/**/*.AppImage.tar.gz", "linux-x86_64"), ("dist/**/*.AppImage", "linux-x86_64")):
               for fichero in glob.glob(pat, recursive=True):
-                  s = fichero + ".sig"
-                  if os.path.exists(s):
+                  s = firmas.get(os.path.basename(fichero) + ".sig")
+                  if s:
                       plataformas[clave] = {"signature": firma(s), "url": base + os.path.basename(fichero)}
+                  else:
+                      print("sin firma para", fichero)
           if not plataformas:
               raise SystemExit("no hay paquetes firmados: revisa que el secreto TAURI_SIGNING_PRIVATE_KEY exista")
           doc = {
