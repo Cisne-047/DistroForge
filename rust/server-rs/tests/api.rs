@@ -8,7 +8,7 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-use distroforge_server::{build_router, db::open_db};
+use distroforge_server::{build_router, build_router_with_ui, db::open_db, DriveManager, TTL};
 
 /// Nueva app con BD en memoria y QEMU inexistente (como los tests TS).
 fn app() -> Router {
@@ -411,4 +411,36 @@ async fn packs_demasiado_grandes_se_rechazan() {
     )
     .await;
     assert_eq!(r.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
+async fn la_interfaz_estatica_tambien_lleva_csp() {
+    // Regresión: el `fallback_service` se añade DESPUÉS de las capas, así que si
+    // `security_headers` se aplica dentro de `build_router_with_drives` los
+    // ficheros de la UI salen sin CSP (y la app es lo que más se sirve).
+    let dir = std::env::temp_dir().join(format!("df-ui-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html><title>df</title>").unwrap();
+    std::fs::write(dir.join("app.js"), "console.log(1)").unwrap();
+
+    let app = build_router_with_ui(
+        open_db(":memory:"),
+        DriveManager::new("qemu-inexistente", TTL),
+        Some(dir.clone()),
+    );
+    for uri in ["/", "/app.js"] {
+        let resp = app
+            .clone()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "{uri}");
+        let csp = resp
+            .headers()
+            .get("content-security-policy")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(csp.contains("default-src 'self'"), "{uri} sin CSP: {csp:?}");
+    }
+    std::fs::remove_dir_all(&dir).ok();
 }

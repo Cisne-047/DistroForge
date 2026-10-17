@@ -49,6 +49,10 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
 - **Test Drive**: todos los candados de sesiones toleran envenenamiento (un pánico
   pasado ya no deja la función muerta) y el contador de displays da la vuelta en vez
   de desbordar el puerto VNC.
+- **CSP también en los estáticos**: la capa de cabeceras se aplicaba al router de la
+  API *antes* de montar el `fallback_service` de la interfaz, así que el `index.html`
+  y los `.wasm`/`.css` salían sin `Content-Security-Policy`. Ahora la capa envuelve
+  el router completo; un test lo cubre.
 
 ## [1.0.0] - 2026-10-17
 

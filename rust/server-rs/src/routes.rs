@@ -112,11 +112,18 @@ impl AppState {
 
 /// Construye el router completo (equivalente a `buildServer` en TS).
 pub fn build_router(db: Connection, qemu_bin: &str) -> Router {
+    // Las cabeceras se aplican al router COMPLETO: si se pusieran en
+    // `build_router_with_drives`, el `fallback_service` de la interfaz (que se
+    // añade después) quedaría fuera de la capa y los estáticos saldrían sin CSP.
     build_router_with_drives(db, DriveManager::new(qemu_bin, TTL))
+        .layer(middleware::from_fn(security_headers))
 }
 
 /// Igual que `build_router` pero reutiliza un `DriveManager` existente
 /// (permite al `main` barrear sesiones caducadas con el mismo gestor).
+///
+/// Ojo: este router **no** lleva las cabeceras de seguridad; las añaden
+/// [`build_router`] y [`build_router_with_ui`] ya sobre el router completo.
 pub fn build_router_with_drives(db: Connection, drives: DriveManager) -> Router {
     let iso_dir = std::env::var("DF_ISO_DIR")
         .ok()
@@ -160,7 +167,6 @@ pub fn build_router_with_drives(db: Connection, drives: DriveManager) -> Router 
         .route("/ws/{id}", get(ws_bridge))
         // nada de cuerpos gigantes en la API
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .layer(middleware::from_fn(security_headers))
         .layer(cors)
         .with_state(state)
 }
@@ -220,13 +226,16 @@ pub fn build_router_with_ui(
         // index.html de la interfaz
         .route("/api/{*resto}", any(api_desconocido));
 
-    match web_dir.filter(|dir| dir.is_dir()) {
+    let router = match web_dir.filter(|dir| dir.is_dir()) {
         Some(dir) => {
             let index = dir.join("index.html");
             api.fallback_service(ServeDir::new(&dir).not_found_service(ServeFile::new(index)))
         }
         None => api,
-    }
+    };
+    // La capa va al final, sobre la API y sobre los estáticos (incluido el
+    // `fallback_service` de arriba).
+    router.layer(middleware::from_fn(security_headers))
 }
 
 /// 404 en JSON para rutas de API que no existen.
