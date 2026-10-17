@@ -70,7 +70,10 @@ jobs:
           cd /tmp/proj/livebuild
           chmod +x auto/* config/hooks/* 2>/dev/null || true
           lb config
-          time lb build
+          # sin `time`: el shell del contenedor es dash y no lo tiene
+          start=$(date +%s)
+          lb build
+          echo "construccion: $(( $(date +%s) - start ))s"
           ls -lh *.iso
 
       - name: Verificar que es una ISO arrancable
