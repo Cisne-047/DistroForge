@@ -11,7 +11,11 @@
 # docs/DESPLIEGUE.md). El Test Drive arranca QEMU: sin /dev/kvm funciona, pero
 # muy lento.
 
-FROM rust:1-slim AS build
+# El compilador va en la MISMA base que el runtime (bookworm): `rust:1-slim` es
+# trixie (glibc 2.39) y el binario salía pidiendo símbolos que bookworm (2.36) no
+# tiene. Hoy solo avisaba de una versión débil y arrancaba, pero es frágil:
+# emparejar las bases elimina el problema de raíz.
+FROM rust:1-slim-bookworm AS build
 WORKDIR /app
 
 # rusqlite "bundled" compila SQLite en C: hace falta toolchain de C.

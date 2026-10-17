@@ -57,6 +57,31 @@ el navegador no la envía.
 Para compilar la interfaz de forma que funcione servida en la raíz hay que pasar
 `--public-url /` (por defecto el proyecto usa `/DistroForge/` para GitHub Pages).
 
+## Probar la imagen en un sandbox (sin Docker local)
+
+Si no tienes Docker en tu máquina, un sandbox de [instabox](https://instabox.sh)
+sirve para construir **y ejecutar** la imagen de verdad (4 vCPU, 8 GB y Docker ya
+instalado):
+
+```bash
+instabox create --name distroforge-docker --template universal --timeout 3h
+instabox exec distroforge-docker -- 'docker --version'      # ya viene instalado
+# sube las fuentes (rust/server-rs + la UI compilada) y construye:
+instabox exec distroforge-docker -- 'cd ~/df && docker build -f rust/server-rs/Dockerfile -t distroforge-server .'
+instabox exec distroforge-docker -- 'docker run -d --name df -p 8080:8080 -e DF_DB_PATH=/data/df.db distroforge-server'
+instabox exec distroforge-docker -- 'curl -fsS localhost:8080/api/health'
+instabox port publish distroforge-docker 8080 --name distroforge   # URL pública HTTPS
+```
+
+La clave se gestiona con `instabox keys` y se pasa en `INSTABOX_API_KEY`; no debe
+quedar en el repositorio.
+
+Es la forma de detectar problemas que solo aparecen al **ejecutar** el
+contenedor: así salió que compilar en `rust:1-slim` (trixie, glibc 2.39) y
+ejecutar en `debian:bookworm-slim` (2.36) dejaba al binario pidiendo símbolos
+inexistentes. El sandbox también trae QEMU, así que `testdrive/available` responde
+`true` y el Test Drive se puede probar de verdad.
+
 ## Variables de entorno
 
 | Variable | Por defecto | Para qué |
