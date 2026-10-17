@@ -1,7 +1,6 @@
-//! Generador kickstart/anaconda (Fedora). Port de
-//! `src/generators/kickstart.ts`.
+//! Generador kickstart/anaconda (Fedora y familia RHEL: Alma, Rocky, Oracle).
 
-use crate::catalog::{desktop_packages, effective_repos};
+use crate::catalog::{base_by_id, desktop_packages, effective_repos};
 use crate::generators::accounts::{
     autologin_files, autostart_files, eula_files, service_shell_lines, target_shell_line,
 };
@@ -32,8 +31,23 @@ pub fn extra_file_post_lines(extra_files: &[ExtraFile]) -> Vec<String> {
 
 /// Ficheros del proyecto kickstart, en el orden de construcción del TS.
 pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
+    let base = base_by_id(cfg.base);
     let sys = &cfg.system;
     let repos = effective_repos(cfg);
+    // Cada base guarda su ks en su propio directorio (`fedora/`, `almalinux/`…).
+    let dir = base.id.as_str();
+    // Fedora usa el mirrorlist con $releasever; los clones, una URL fija.
+    let url_line = if base.mirror.contains("mirrors.fedoraproject.org/mirrorlist") {
+        format!(
+            "url --mirrorlist=\"https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch={}\"",
+            if cfg.arch == ArchId::Aarch64 { "aarch64" } else { "x86_64" }
+        )
+    } else {
+        format!("url --url=\"{}\"", base.mirror)
+    };
+    // releasever para livemedia-creator: "Fedora 44" → 44, "AlmaLinux 9" → 9.
+    let releasever = base.label.rsplit(' ').next().unwrap_or("44");
+    let container = base.container.unwrap_or("fedora:latest");
 
     let repo_lines = repos
         .iter()
@@ -99,11 +113,6 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         ),
         None => format!("network --bootproto=dhcp --hostname={}", sys.hostname),
     };
-    let ks_arch = if cfg.arch == ArchId::Aarch64 {
-        "aarch64"
-    } else {
-        "x86_64"
-    };
     let grub_append = cfg
         .grub
         .extra_params
@@ -149,36 +158,39 @@ pub fn kickstart_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     }
 
     let ks = format!(
-        "# DistroForge - kickstart Fedora\nlang {}\nkeyboard --vckeymap={} --xlayouts='{}'\ntimezone {} --utc\n{}\nrootpw --lock\nuser --name={} --password=\"{}\" --plaintext --groups=wheel\n{}\nfirstboot --disable\nfirewall {}\nbootloader --location=mbr --timeout={}{}\nzerombr\nclearpart --all --initlabel\nautopart\nreboot\nurl --mirrorlist=\"https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch={ks_arch}\"\n{repo_lines}\n%packages\n@core\n{}\n%end\n\n{post_block}",
-        sys.locale,
-        sys.keyboard,
-        sys.keyboard,
-        sys.timezone,
-        net_line,
-        sys.username,
-        sys.password,
-        user_lines,
-        if cfg.firewall {
+        "# DistroForge - kickstart {label}\nlang {locale}\nkeyboard --vckeymap={keyboard} --xlayouts='{keyboard}'\ntimezone {timezone} --utc\n{net_line}\nrootpw --lock\nuser --name={username} --password=\"{password}\" --plaintext --groups=wheel\n{user_lines}\nfirstboot --disable\nfirewall {firewall}\nbootloader --location=mbr --timeout={timeout}{append}\nzerombr\nclearpart --all --initlabel\nautopart\nreboot\n{url_line}\n{repo_lines}\n%packages\n@core\n{packages}\n%end\n\n{post_block}",
+        label = base.label,
+        locale = sys.locale,
+        keyboard = sys.keyboard,
+        timezone = sys.timezone,
+        net_line = net_line,
+        username = sys.username,
+        password = sys.password,
+        user_lines = user_lines,
+        firewall = if cfg.firewall {
             format!("--enabled{firewall_ports}")
         } else {
             "--disabled".to_string()
         },
-        js_num(cfg.grub.timeout),
-        if grub_append.is_empty() {
+        timeout = js_num(cfg.grub.timeout),
+        append = if grub_append.is_empty() {
             String::new()
         } else {
             format!(" --append=\"{grub_append}\"")
         },
-        pkg_items.join("\n"),
+        packages = pkg_items.join("\n"),
     );
 
     let build_sh = format!(
-        "#!/usr/bin/env bash\nset -euo pipefail\n# DistroForge - build local (Linux o WSL2, requiere Podman)\nDIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\npodman run --rm --privileged -v \"$DIR\":/project -v \"$DIR/out\":/out fedora:latest bash -ec '\n  dnf install -y livemedia-creator\n  livemedia-creator --no-virt --make-iso --ks /project/fedora/ks.cfg --releasever 44 --iso-only --iso-name {}.iso --resultdir /out\n'\necho \"Imagen lista en ./out/{}.iso\"\n",
-        cfg.name, cfg.name
+        "#!/usr/bin/env bash\nset -euo pipefail\n# DistroForge - build local (Linux o WSL2, requiere Podman)\nDIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\npodman run --rm --privileged -v \"$DIR\":/project -v \"$DIR/out\":/out {container} bash -ec '\n  dnf install -y livemedia-creator\n  livemedia-creator --no-virt --make-iso --ks /project/{dir}/ks.cfg --releasever {releasever} --iso-only --iso-name {name}.iso --resultdir /out\n'\necho \"Imagen lista en ./out/{name}.iso\"\n",
+        container = container,
+        dir = dir,
+        releasever = releasever,
+        name = cfg.name
     );
 
     vec![
-        ("fedora/ks.cfg".to_string(), ks),
+        (format!("{dir}/ks.cfg"), ks),
         ("build.sh".to_string(), build_sh),
     ]
 }

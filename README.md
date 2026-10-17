@@ -13,7 +13,7 @@ Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo gen
 
 ## Qué genera
 
-- **14 bases**: openSUSE (Tumbleweed/Leap), familia Debian (Debian, Ubuntu, Mint, elementary, Pop!_OS, Zorin), familia Arch (Arch, Manjaro, CachyOS), Fedora, Gentoo y Solus (guía manual).
+- **21 bases**: openSUSE (Tumbleweed/Leap), familia Debian (Debian, Ubuntu, Mint, elementary, Pop!_OS, Zorin, Kali, MX), familia Arch (Arch, Manjaro, CachyOS, Garuda, SteamOS), Fedora y clones RHEL (AlmaLinux, Rocky Linux, Oracle Linux), Gentoo y Solus (guía manual).
 - **4 motores ISO**: KIWI NG, live-build, mkarchiso y kickstart + livemedia-creator.
 - **8 salidas**: ISO, QCOW2, USB/raw, VMDK, VDI, VHD, **OCI** (con SBOM syft + escaneo trivy + firma cosign opcional) y **WSL**.
 - **Arquitecturas**: x86_64, aarch64 (runners ARM nativos en CI), armhf (QEMU), i386.

@@ -1293,17 +1293,24 @@ fn base_by_id_cubre_todas_las_variantes() {
         BaseId::Elementary,
         BaseId::Pop,
         BaseId::Zorin,
+        BaseId::Kali,
+        BaseId::Mx,
         BaseId::Fedora,
+        BaseId::Almalinux,
+        BaseId::Rocky,
+        BaseId::Oracle,
         BaseId::Arch,
         BaseId::Manjaro,
         BaseId::Cachyos,
+        BaseId::Garuda,
+        BaseId::Steamos,
         BaseId::Gentoo,
         BaseId::Solus,
     ];
     for id in all {
         assert_eq!(base_by_id(id).id, id);
     }
-    assert_eq!(BASES.len(), 14);
+    assert_eq!(BASES.len(), 21);
 }
 
 #[test]
@@ -1515,4 +1522,38 @@ fn el_workflow_de_livebuild_corre_con_privilegios() {
 
     // y el script local sigue llevándolos
     assert!(lb.get("build.sh").unwrap().contains("--privileged"));
+}
+
+#[test]
+fn todas_las_bases_pasan_la_validacion_por_defecto() {
+    // Lo que el CLI y el WASM exigen antes de generar: si una base del catálogo
+    // no valida, su tarjeta quedaría inutilizable en la UI.
+    for b in BASES.iter() {
+        let problems = validate(&cfg_for(b.id));
+        assert!(problems.is_empty(), "{}: {problems:?}", b.id.as_str());
+    }
+}
+
+#[test]
+fn cada_base_y_escritorio_genera_proyecto() {
+    for b in BASES.iter() {
+        for d in b.desktops {
+            let mut c = cfg_for(b.id);
+            c.desktop = d.id.to_string();
+            let problems = validate(&c);
+            assert!(
+                problems.is_empty(),
+                "{} / {}: {problems:?}",
+                b.id.as_str(),
+                d.id
+            );
+            let files = generate_project(&c);
+            assert!(
+                files.values().all(|v| !v.contains("undefined")),
+                "{} / {}",
+                b.id.as_str(),
+                d.id
+            );
+        }
+    }
 }

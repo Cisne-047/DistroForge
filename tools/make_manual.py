@@ -164,10 +164,20 @@ def build():
         doc,
         ["Familia", "Versiones", "Gestor", "Motor por defecto"],
         [
-            ["openSUSE", "Tumbleweed, Leap 16, Slowroll, MicroOS", "zypper", "KIWI NG"],
-            ["Debian", "Debian 13, Ubuntu 24.04, Mint, elementary, Pop!_OS, Zorin", "apt", "live-build"],
-            ["Arch", "Arch, Manjaro, CachyOS", "pacman", "mkarchiso"],
-            ["Fedora", "Fedora 44", "dnf", "kickstart + livemedia-creator"],
+            ["openSUSE", "Tumbleweed, Leap 15.6", "zypper", "KIWI NG"],
+            [
+                "Debian",
+                "Debian 12, Ubuntu 24.04, Mint, elementary, Pop!_OS, Zorin, Kali, MX",
+                "apt",
+                "live-build",
+            ],
+            ["Arch", "Arch, Manjaro, CachyOS, Garuda, SteamOS", "pacman", "mkarchiso"],
+            [
+                "Fedora / RHEL",
+                "Fedora 44, AlmaLinux 9, Rocky Linux 9, Oracle Linux 9",
+                "dnf",
+                "kickstart + livemedia-creator",
+            ],
             ["Gentoo", "rolling", "portage", "guía manual"],
             ["Solus", "rolling", "eopkg", "guía manual"],
         ],
@@ -181,7 +191,7 @@ def build():
             ["KIWI NG", "openSUSE / SUSE", "config.xml + config.sh + árbol de overlay; ISO, QCOW2, OCI"],
             ["live-build", "Debian y derivados", "config/ completo con preseed; ISO híbrida y USB"],
             ["mkarchiso", "Arch y derivados", "perfil de archiso (profiledef.sh, packages.x86_64)"],
-            ["kickstart", "Fedora y derivados", "kickstart + livemedia-creator; ISO y disco"],
+            ["kickstart", "Fedora y clones RHEL", "kickstart + livemedia-creator; ISO y disco"],
         ],
         widths=[Pt(80), Pt(120), Pt(280)],
     )

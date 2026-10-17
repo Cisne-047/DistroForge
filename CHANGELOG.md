@@ -4,6 +4,13 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Más distros en el catálogo (de 14 a 21)**: Kali Linux y MX Linux (live-build),
+  AlmaLinux 9, Rocky Linux 9 y Oracle Linux 9 (kickstart, con grupos de dnf de la
+  familia RHEL) y Garuda Linux y SteamOS (mkarchiso, con repos Chaotic-AUR y
+  holo/multilib). SteamOS añade un escritorio "modo juego" con Gamescope y Steam.
+
 ### Cambiado
 
 - **Solo queda Rust**: se elimina el código heredado (la app React/TS y el backend

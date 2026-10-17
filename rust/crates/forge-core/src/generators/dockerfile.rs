@@ -21,10 +21,17 @@ fn base_image(base: BaseId) -> Option<&'static str> {
         BaseId::Elementary => "ubuntu:24.04",
         BaseId::Pop => "ubuntu:22.04",
         BaseId::Zorin => "ubuntu:24.04",
+        BaseId::Kali => "kalilinux/kali-rolling",
+        BaseId::Mx => "debian:bookworm",
         BaseId::Fedora => "fedora:latest",
+        BaseId::Almalinux => "almalinux:9",
+        BaseId::Rocky => "rockylinux:9",
+        BaseId::Oracle => "oraclelinux:9",
         BaseId::OpensuseTumbleweed => "opensuse/tumbleweed",
         BaseId::OpensuseLeap => "opensuse/leap:15.6",
-        BaseId::Arch | BaseId::Manjaro | BaseId::Cachyos => "archlinux:latest",
+        BaseId::Arch | BaseId::Manjaro | BaseId::Cachyos | BaseId::Garuda | BaseId::Steamos => {
+            "archlinux:latest"
+        }
         BaseId::Gentoo | BaseId::Solus => return None,
     })
 }

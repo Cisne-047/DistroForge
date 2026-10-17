@@ -1,4 +1,4 @@
-//! Generador mkarchiso (Arch, Manjaro, CachyOS). Port de
+//! Generador mkarchiso (Arch, Manjaro, CachyOS, Garuda, SteamOS). Port de
 //! `src/generators/archiso.ts`.
 
 use crate::catalog::{base_by_id, desktop_packages, effective_repos};

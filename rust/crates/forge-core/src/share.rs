@@ -115,7 +115,7 @@ pub fn encode_config(cfg: &DistroConfig) -> String {
 ///
 /// Desviaciones mínimas respecto al TS, documentadas:
 /// - El TS solo exige `typeof name === "string" && typeof base === "string"`;
-///   en Rust además la `base` debe ser una de las 14 variantes del enum
+///   en Rust además la `base` debe ser una de las 21 variantes del enum
 ///   (una base desconocida devolvería `null` igualmente al serializar mal) y
 ///   los campos que falten toman defaults coherentes en vez de `undefined`.
 pub fn decode_config(hash: &str) -> Option<DistroConfig> {

@@ -1,4 +1,4 @@
-//! Paso 1: base (14 tarjetas, plantillas rápidas, escritorios, arquitecturas,
+//! Paso 1: base (21 tarjetas, plantillas rápidas, escritorios, arquitecturas,
 //! modo advanced y preview del escritorio). Port de `BaseStep`.
 
 use forge_core::catalog::{self, archs_for_engine, base_by_id, BASES};
@@ -28,7 +28,8 @@ pub fn BaseStep(cfg: RwSignal<DistroConfig>) -> impl IntoView {
             <p class="hint">
                 "La familia y la versión deciden el motor de construcción, los repos y los valores por
                 defecto del resto de pasos. El motor se deduce solo: KIWI NG para openSUSE, live-build
-                para Debian, mkarchiso para Arch y kickstart para Fedora."
+                para Debian y derivadas, mkarchiso para Arch y derivadas y kickstart para Fedora y clones
+                de RHEL."
             </p>
             <h3>"Plantillas rápidas"</h3>
             <div class="chips">

@@ -85,7 +85,7 @@ impl fmt::Display for ArchId {
     }
 }
 
-/// Base del sistema (`BaseId`), 14 distribuciones soportadas.
+/// Base del sistema (`BaseId`), 21 distribuciones soportadas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BaseId {
@@ -108,14 +108,28 @@ pub enum BaseId {
     Pop,
     /// Zorin OS 18.
     Zorin,
+    /// Kali Linux (rolling).
+    Kali,
+    /// MX Linux 23.
+    Mx,
     /// Fedora 44.
     Fedora,
+    /// AlmaLinux 9.
+    Almalinux,
+    /// Rocky Linux 9.
+    Rocky,
+    /// Oracle Linux 9.
+    Oracle,
     /// Arch Linux.
     Arch,
     /// Manjaro.
     Manjaro,
     /// CachyOS.
     Cachyos,
+    /// Garuda Linux.
+    Garuda,
+    /// SteamOS (Arch, solo x86_64).
+    Steamos,
     /// Gentoo.
     Gentoo,
     /// Solus.
@@ -134,10 +148,17 @@ impl BaseId {
             Self::Elementary => "elementary",
             Self::Pop => "pop",
             Self::Zorin => "zorin",
+            Self::Kali => "kali",
+            Self::Mx => "mx",
+            Self::Fedora => "fedora",
+            Self::Almalinux => "almalinux",
+            Self::Rocky => "rocky",
+            Self::Oracle => "oracle",
             Self::Arch => "arch",
             Self::Manjaro => "manjaro",
             Self::Cachyos => "cachyos",
-            Self::Fedora => "fedora",
+            Self::Garuda => "garuda",
+            Self::Steamos => "steamos",
             Self::Gentoo => "gentoo",
             Self::Solus => "solus",
         }
@@ -155,10 +176,17 @@ impl BaseId {
             "elementary" => Self::Elementary,
             "pop" => Self::Pop,
             "zorin" => Self::Zorin,
+            "kali" => Self::Kali,
+            "mx" => Self::Mx,
             "arch" => Self::Arch,
             "manjaro" => Self::Manjaro,
             "cachyos" => Self::Cachyos,
+            "garuda" => Self::Garuda,
+            "steamos" => Self::Steamos,
             "fedora" => Self::Fedora,
+            "almalinux" => Self::Almalinux,
+            "rocky" => Self::Rocky,
+            "oracle" => Self::Oracle,
             "gentoo" => Self::Gentoo,
             "solus" => Self::Solus,
             _ => return None,

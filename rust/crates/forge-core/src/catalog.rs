@@ -597,6 +597,121 @@ static CACHYOS_PRESET_REPOS: [PresetRepo; 1] = [PresetRepo {
     suite: "",
 }];
 
+/// Repos de MX Linux (paquetes propios sobre Debian bookworm).
+static MX_PRESET_REPOS: [PresetRepo; 1] = [PresetRepo {
+    alias: "mx",
+    url: "https://mxrepo.com/mx/repo/",
+    suite: "bookworm",
+}];
+
+/// Garuda: repos propios (Chaotic-AUR) sobre Arch.
+static GARUDA_PRESET_REPOS: [PresetRepo; 1] = [PresetRepo {
+    alias: "chaotic-aur",
+    url: "https://cdn-mirror.chaotic.cx/chaotic-aur",
+    suite: "",
+}];
+
+/// SteamOS: repos de Valve (holo) y multilib para Steam.
+static STEAMOS_PRESET_REPOS: [PresetRepo; 2] = [
+    PresetRepo {
+        alias: "holo",
+        url: "https://steamdeck-packages.steamos.cloud/archlinux-mirror/$repo/os/$arch",
+        suite: "",
+    },
+    PresetRepo {
+        alias: "multilib",
+        url: "https://geo.mirror.pkgbuild.com/$repo/os/$arch",
+        suite: "",
+    },
+];
+
+/// Escritorios de la familia RHEL (grupos de dnf de RHEL 9 y clones).
+static RHEL_DESKTOPS: [DesktopDef; 7] = [
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["@gnome-desktop"],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["@kde-desktop"],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["@xfce"],
+    },
+    DesktopDef {
+        id: "mate",
+        label: "MATE",
+        packages: &["@mate-desktop"],
+    },
+    DesktopDef {
+        id: "lxqt",
+        label: "LXQt",
+        packages: &["@lxqt"],
+    },
+    DesktopDef {
+        id: "i3",
+        label: "i3 (tiling WM)",
+        packages: &["i3", "i3status"],
+    },
+];
+
+/// Escritorios de Kali (metapaquetes propios, no los `task-*` de Debian).
+static KALI_DESKTOPS: [DesktopDef; 5] = [
+    DesktopDef {
+        id: "none",
+        label: "Sin escritorio (servidor)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "xfce",
+        label: "Xfce",
+        packages: &["kali-desktop-xfce"],
+    },
+    DesktopDef {
+        id: "gnome",
+        label: "GNOME",
+        packages: &["kali-desktop-gnome"],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma",
+        packages: &["kali-desktop-kde"],
+    },
+    DesktopDef {
+        id: "lxde",
+        label: "LXDE",
+        packages: &["kali-desktop-lxde"],
+    },
+];
+
+/// Escritorios de SteamOS: sesión de juegos (gamescope) o escritorio KDE.
+static STEAMOS_DESKTOPS: [DesktopDef; 3] = [
+    DesktopDef {
+        id: "none",
+        label: "Consola (sin escritorio)",
+        packages: &[],
+    },
+    DesktopDef {
+        id: "gamescope",
+        label: "Modo juego (Gamescope)",
+        packages: &["gamescope", "steam", "mangohud", "lib32-mangohud"],
+    },
+    DesktopDef {
+        id: "kde",
+        label: "KDE Plasma (modo escritorio)",
+        packages: &["plasma-meta", "sddm", "steam"],
+    },
+];
+
 const DEBIAN_SUGGESTIONS: [&str; 18] = [
     "firefox",
     "vim",
@@ -750,9 +865,9 @@ const GENTOO_SUGGESTIONS: [&str; 20] = [
     "app-shells/zsh",
 ];
 
-/// Catálogo de las 14 bases. El orden replica `BASES` del TS; `base_by_id`
+/// Catálogo de las 21 bases. El orden replica `BASES` del TS; `base_by_id`
 /// indexa este array con literales verificados en compilación.
-pub static BASES: [BaseDef; 14] = [
+pub static BASES: [BaseDef; 21] = [
     BaseDef {
         id: BaseId::OpensuseTumbleweed,
         label: "openSUSE Tumbleweed",
@@ -866,6 +981,34 @@ pub static BASES: [BaseDef; 14] = [
         suggestions: &SUGGESTIONS,
     },
     BaseDef {
+        id: BaseId::Kali,
+        label: "Kali Linux (rolling)",
+        engine: crate::types::EngineId::Livebuild,
+        mirror: "http://http.kali.org/kali",
+        distribution: Some("kali-rolling"),
+        archive_areas: Some("main contrib non-free non-free-firmware"),
+        lb_flavour: Some("amd64"),
+        container: Some("kalilinux/kali-rolling"),
+        kernel_package: Some("linux-image-amd64"),
+        preset_repos: &[],
+        desktops: &KALI_DESKTOPS,
+        suggestions: &DEBIAN_SUGGESTIONS,
+    },
+    BaseDef {
+        id: BaseId::Mx,
+        label: "MX Linux 23",
+        engine: crate::types::EngineId::Livebuild,
+        mirror: "http://deb.debian.org/debian",
+        distribution: Some("bookworm"),
+        archive_areas: Some("main contrib non-free non-free-firmware"),
+        lb_flavour: Some("amd64"),
+        container: Some("debian:bookworm"),
+        kernel_package: Some("linux-image-amd64"),
+        preset_repos: &MX_PRESET_REPOS,
+        desktops: &DEBIAN_DESKTOPS,
+        suggestions: &DEBIAN_SUGGESTIONS,
+    },
+    BaseDef {
         id: BaseId::Fedora,
         label: "Fedora 44",
         engine: crate::types::EngineId::Kickstart,
@@ -877,6 +1020,48 @@ pub static BASES: [BaseDef; 14] = [
         kernel_package: None,
         preset_repos: &[],
         desktops: &FEDORA_DESKTOPS,
+        suggestions: &SUGGESTIONS,
+    },
+    BaseDef {
+        id: BaseId::Almalinux,
+        label: "AlmaLinux 9",
+        engine: crate::types::EngineId::Kickstart,
+        mirror: "https://repo.almalinux.org/almalinux/9/BaseOS/x86_64/os/",
+        distribution: None,
+        archive_areas: None,
+        lb_flavour: None,
+        container: Some("almalinux:9"),
+        kernel_package: None,
+        preset_repos: &[],
+        desktops: &RHEL_DESKTOPS,
+        suggestions: &SUGGESTIONS,
+    },
+    BaseDef {
+        id: BaseId::Rocky,
+        label: "Rocky Linux 9",
+        engine: crate::types::EngineId::Kickstart,
+        mirror: "https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/",
+        distribution: None,
+        archive_areas: None,
+        lb_flavour: None,
+        container: Some("rockylinux:9"),
+        kernel_package: None,
+        preset_repos: &[],
+        desktops: &RHEL_DESKTOPS,
+        suggestions: &SUGGESTIONS,
+    },
+    BaseDef {
+        id: BaseId::Oracle,
+        label: "Oracle Linux 9",
+        engine: crate::types::EngineId::Kickstart,
+        mirror: "https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/",
+        distribution: None,
+        archive_areas: None,
+        lb_flavour: None,
+        container: Some("oraclelinux:9"),
+        kernel_package: None,
+        preset_repos: &[],
+        desktops: &RHEL_DESKTOPS,
         suggestions: &SUGGESTIONS,
     },
     BaseDef {
@@ -922,6 +1107,34 @@ pub static BASES: [BaseDef; 14] = [
         suggestions: &CACHYOS_SUGGESTIONS,
     },
     BaseDef {
+        id: BaseId::Garuda,
+        label: "Garuda Linux",
+        engine: crate::types::EngineId::Mkarchiso,
+        mirror: "https://geo.mirror.pkgbuild.com/$repo/os/$arch",
+        distribution: None,
+        archive_areas: None,
+        lb_flavour: None,
+        container: None,
+        kernel_package: Some("linux"),
+        preset_repos: &GARUDA_PRESET_REPOS,
+        desktops: &ARCH_DESKTOPS,
+        suggestions: &SUGGESTIONS,
+    },
+    BaseDef {
+        id: BaseId::Steamos,
+        label: "SteamOS (Arch)",
+        engine: crate::types::EngineId::Mkarchiso,
+        mirror: "https://geo.mirror.pkgbuild.com/$repo/os/$arch",
+        distribution: None,
+        archive_areas: None,
+        lb_flavour: None,
+        container: None,
+        kernel_package: Some("linux"),
+        preset_repos: &STEAMOS_PRESET_REPOS,
+        desktops: &STEAMOS_DESKTOPS,
+        suggestions: &SUGGESTIONS,
+    },
+    BaseDef {
         id: BaseId::Gentoo,
         label: "Gentoo",
         engine: crate::types::EngineId::Manual,
@@ -964,12 +1177,19 @@ pub fn base_by_id(id: BaseId) -> &'static BaseDef {
         BaseId::Elementary => &BASES[5],
         BaseId::Pop => &BASES[6],
         BaseId::Zorin => &BASES[7],
-        BaseId::Fedora => &BASES[8],
-        BaseId::Arch => &BASES[9],
-        BaseId::Manjaro => &BASES[10],
-        BaseId::Cachyos => &BASES[11],
-        BaseId::Gentoo => &BASES[12],
-        BaseId::Solus => &BASES[13],
+        BaseId::Kali => &BASES[8],
+        BaseId::Mx => &BASES[9],
+        BaseId::Fedora => &BASES[10],
+        BaseId::Almalinux => &BASES[11],
+        BaseId::Rocky => &BASES[12],
+        BaseId::Oracle => &BASES[13],
+        BaseId::Arch => &BASES[14],
+        BaseId::Manjaro => &BASES[15],
+        BaseId::Cachyos => &BASES[16],
+        BaseId::Garuda => &BASES[17],
+        BaseId::Steamos => &BASES[18],
+        BaseId::Gentoo => &BASES[19],
+        BaseId::Solus => &BASES[20],
     }
 }
 
