@@ -26,6 +26,10 @@ module.exports = defineConfig({
     // el mismo servidor estático que usa la vista previa local
     command: `python3 -m http.server ${port} --bind 127.0.0.1 --directory "${dist}"`,
     port,
+    // Ojo: con `true`, si quedó un `http.server` viejo escuchando (p. ej. de una
+    // sesión anterior con otro CWD) se reutiliza y se prueban ficheros que no son
+    // los de `dist`. Si los tests "pasan" con un catálogo viejo, mira el hash del
+    // WASM que sirve el puerto antes de culpar al código.
     reuseExistingServer: true,
     timeout: 30000,
   },

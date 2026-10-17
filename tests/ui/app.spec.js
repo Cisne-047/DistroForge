@@ -41,6 +41,21 @@ test("elegir una base la refleja en el resumen", async ({ page }) => {
   await expect(resumen).toContainText("livebuild");
 });
 
+test("el catálogo incluye las distros nuevas", async ({ page }) => {
+  // El catálogo se pinta desde el WASM: si falta una base, la tarjeta no existe.
+  for (const nombre of [
+    "Kali Linux",
+    "MX Linux",
+    "AlmaLinux",
+    "Rocky Linux",
+    "Oracle Linux",
+    "Garuda",
+    "SteamOS",
+  ]) {
+    await expect(page.getByText(nombre, { exact: false }).first()).toBeVisible();
+  }
+});
+
 test("se puede navegar entre pasos", async ({ page }) => {
   await page.locator("nav button").nth(2).click();
   await expect(page.locator("h2").first()).not.toContainText("Elige la base");
