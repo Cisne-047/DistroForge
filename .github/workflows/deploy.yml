@@ -29,6 +29,10 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - name: Trunk
         uses: jetli/trunk-action@v0.5.0
+        with:
+          # trunk 0.19 instalaba Binaryen 116, que no lee el wasm de los Rust
+          # recientes; 0.21 usa 123 y es el mismo build que se prueba en local.
+          version: v0.21.14
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
