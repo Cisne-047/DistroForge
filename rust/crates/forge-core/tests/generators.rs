@@ -1054,14 +1054,14 @@ fn grub_timeout_y_parametros_en_los_cuatro_motores() {
     assert!(!auto.contains("--grub-timeout"));
     assert!(auto.contains("vt.global_cursor_default=0"));
     let hook = lb
-        .get("livebuild/config/hooks/0900-grub-timeout.hook.binary")
+        .get("livebuild/config/hooks/live/0900-timeout.binary")
         .expect("falta el hook que aplica el timeout de arranque");
     // GRUB usa segundos; isolinux, décimas (0 = esperar siempre, que es lo que
     // hacía que el menú se quedara colgado).
     assert!(hook.contains("set timeout=7"));
     assert!(hook.contains("timeout 70"));
-    assert!(hook.contains("binary/isolinux/isolinux.cfg"));
-    assert!(hook.contains("binary/boot/grub/grub.cfg"));
+    // la ruta importa: live-build solo ejecuta config/hooks/{normal,live}/*.<fase>
+    assert!(!lb.contains_key("livebuild/config/hooks/0900-grub-timeout.hook.binary"));
     let ks = generate_project(&g(cfg_for(BaseId::Fedora)))
         .get("fedora/ks.cfg")
         .unwrap()

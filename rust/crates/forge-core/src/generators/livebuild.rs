@@ -282,15 +282,18 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     files.extend(net_files);
     // live-build no acepta ninguna opción de timeout (`--grub-timeout` no existe:
     // `lb config` aborta con "unrecognized option" y el proyecto no se construye).
-    // Se ajusta en la fase binary, que es donde live-build sí lo permite. En
-    // arranque BIOS manda isolinux y su `timeout` va en décimas de segundo (0 =
-    // esperar siempre); en GRUB/UEFI el menú usa `set timeout=`.
+    // Se ajusta en la fase binary, que es donde live-build lo permite, y con la
+    // ruta que live-build realmente ejecuta: `config/hooks/live/*.binary` (su
+    // script binary_hooks recorre `config/hooks/normal/*.binary` y
+    // `config/hooks/live/*.binary`). En arranque BIOS manda isolinux y su
+    // `timeout` va en décimas de segundo (0 = esperar siempre); en GRUB/UEFI el
+    // menú usa `set timeout=`.
     let arranque_timeout = js_num(cfg.grub.timeout);
     let isolinux_timeout = format!("{}", (cfg.grub.timeout * 10.0).round() as i64);
     files.push((
-        "livebuild/config/hooks/0900-grub-timeout.hook.binary".to_string(),
+        "livebuild/config/hooks/live/0900-timeout.binary".to_string(),
         format!(
-            "#!/bin/sh\nset -e\n# DistroForge - timeout del menu de arranque ({t}s)\nfor cfg in binary/isolinux/isolinux.cfg binary/boot/grub/grub.cfg binary/boot/grub/config.cfg; do\n  if [ -f \"$cfg\" ]; then\n    sed -i \"s/^timeout .*/timeout {tt}/\" \"$cfg\" || true\n    sed -i \"s/^set timeout=.*/set timeout={t}/\" \"$cfg\" || true\n  fi\ndone\n",
+            "#!/bin/sh\nset -e\n# DistroForge - timeout del menu de arranque ({t}s)\n# El directorio de trabajo de los hooks binary es `binary/`, pero se busca por\n# si live-build cambia de convención.\nfor cfg in $(find . -maxdepth 4 -name isolinux.cfg -o -maxdepth 4 -name grub.cfg 2>/dev/null | grep -v /chroot/ || true); do\n  sed -i \"s/^timeout .*/timeout {tt}/\" \"$cfg\" || true\n  sed -i \"s/^set timeout=.*/set timeout={t}/\" \"$cfg\" || true\ndone\n",
             t = arranque_timeout,
             tt = isolinux_timeout
         ),
