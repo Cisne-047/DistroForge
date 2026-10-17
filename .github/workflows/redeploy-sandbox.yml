@@ -137,7 +137,7 @@ jobs:
             exit 1
           fi
           docker exec "${CNAME}-next" sh -c 'grep -rqs "SteamOS" /app/web && echo "interfaz nueva: OK"'
-          docker exec "${CNAME}-next" sh -c 'curl -fsS http://127.0.0.1:8080/api/gallery >/dev/null && echo "base de datos: OK"'
+          docker exec "${CNAME}-next" sh -c 'curl -fsS http://127.0.0.1:8080/api/packs >/dev/null && echo "base de datos: OK"'
           docker rm -f "${CNAME}-next" >/dev/null
 
           echo "== sustituir $CNAME (vuelta atrás disponible: $OLD_IMAGE) =="
