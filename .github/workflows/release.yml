@@ -155,7 +155,9 @@ jobs:
       - name: Subir firmas del updater
         uses: actions/upload-artifact@v4
         with:
-          name: distroforge-updater-signatures
+          # nombre único por plataforma: con el mismo nombre en los dos jobs, uno
+          # de los dos conjuntos de firmas se perdía al descargar los artefactos
+          name: distroforge-updater-signatures-${{ matrix.platform }}
           path: |
             rust/tauri-app/src-tauri/target/release/bundle/appimage/*.sig
             rust/tauri-app/src-tauri/target/release/bundle/nsis/*.sig
