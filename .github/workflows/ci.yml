@@ -70,15 +70,7 @@ jobs:
       - name: Check (wasm)
         run: rustup target add wasm32-unknown-unknown && cargo check --target wasm32-unknown-unknown
       - name: Build release
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release && exit 0; sleep 10; done; exit 1
-            rm -rf dist .stage
-            if trunk build --release; then exit 0; fi
-            echo "::warning::intento $intento de la interfaz fallido; se reintenta"
-            sleep 10
-          done
-          echo "::error::la interfaz no se construyo tras 3 intentos"
-          exit 1
+        run: trunk build --release
       - name: wasm-opt (binaryen)
         run: |
           curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz
@@ -135,8 +127,7 @@ jobs:
           workspaces: rust/web-ui
       - name: Interfaz servida en la raíz (como en la imagen y el túnel)
         working-directory: rust/web-ui
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
+        run: trunk build --release --public-url /
       - name: Node
         uses: actions/setup-node@v4
         with:

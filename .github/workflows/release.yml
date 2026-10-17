@@ -82,8 +82,7 @@ jobs:
       # esos assets absolutos no existen (ventana en blanco).
       - name: UI (Trunk)
         working-directory: rust/web-ui
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
+        run: trunk build --release --public-url /
 
       - name: Empaquetar (deb + rpm)
         if: matrix.platform == 'ubuntu-22.04'
@@ -114,7 +113,7 @@ jobs:
           # El bundler de AppImage descarga linuxdeploy y AppRun de GitHub
           # Releases en tiempo de empaquetado. Un 504 del CDN tumbaba el job
           # entero (run 38783927835), así que reintentamos con espera.
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release && exit 0; sleep 10; done; exit 1
+          for intento in 1 2 3; do
             if cargo tauri build --bundles appimage; then
               echo "AppImage generado en el intento $intento"
               exit 0

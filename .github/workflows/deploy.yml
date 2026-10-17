@@ -37,8 +37,7 @@ jobs:
         # (Settings → Variables). Si está vacía, la app usa su propio origen.
         env:
           DISTROFORGE_SERVER_URL: ${{ vars.DISTROFORGE_SERVER_URL }}
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release && exit 0; sleep 10; done; exit 1
+        run: trunk build --release
       - name: wasm-opt (binaryen)
         run: |
           curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz | tar xz

@@ -42,8 +42,7 @@ jobs:
 
       - name: Interfaz
         working-directory: rust/web-ui
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
+        run: trunk build --release --public-url /
 
       - name: Buildx
         uses: docker/setup-buildx-action@v3

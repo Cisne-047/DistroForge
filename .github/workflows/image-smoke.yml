@@ -61,8 +61,7 @@ jobs:
       - name: Interfaz (la imagen la incluye)
         if: env.INSTABOX_API_KEY != ''
         working-directory: rust/web-ui
-        run: |
-          run: for i in 1 2 3; do rm -rf dist .stage; trunk build --release --public-url / && exit 0; sleep 10; done; exit 1
+        run: trunk build --release --public-url /
 
       - name: CLI de instabox
         if: env.INSTABOX_API_KEY != ''
