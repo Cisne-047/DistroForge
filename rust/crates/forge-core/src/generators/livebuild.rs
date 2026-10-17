@@ -13,7 +13,7 @@ use crate::generators::branding::{
 use crate::generators::cloudinit::{cloud_init_yaml, CLOUD_INIT_PACKAGE};
 use crate::generators::flatpak::{flatpak_packages, flatpak_shell_lines, has_flatpak_apps};
 use crate::generators::network::{nm_connection, static_network};
-use crate::generators::shell::{dq, sq};
+use crate::generators::shell::dq;
 use crate::types::{js_num, DistroConfig};
 
 /// Sanea un alias de repo para nombres de fichero
@@ -129,10 +129,20 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             } else {
                 "SIGNED=\"[trusted=yes]\"".to_string()
             };
+            // Comillas dobles y no simples: la línea lleva `$SIGNED`, que define
+            // este mismo hook arriba, y con comillas simples quedaba literal en el
+            // fichero (`deb $SIGNED ...`), con lo que apt no podía leer el origen
+            // y el build moría con "The list of sources could not be read".
+            // El escapado es propio porque `dq` escapa el `$` (que aquí debe
+            // expandirse) y `sq` no expande nada.
             let deb_line = if !r.suite.is_empty() {
-                sq(&format!("deb $SIGNED {} {}", r.url, r.suite))
+                format!(
+                    "\"deb $SIGNED {} {}\"",
+                    dq_repo(&r.url),
+                    dq_repo(&r.suite)
+                )
             } else {
-                sq(&format!("deb $SIGNED {} ./", r.url))
+                format!("\"deb $SIGNED {} ./\"", dq_repo(&r.url))
             };
             // Ojo: el TS genera un salto de línea REAL dentro del formato de
             // printf ('%s\n' partido en dos líneas del fichero). Se replica.
@@ -200,7 +210,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         ));
         // NM ignora keyfiles legibles por el mundo: 600 en el build
         net_files.push((
-            "livebuild/config/hooks/0330-distroforge-net.hooks.chroot".to_string(),
+            "livebuild/config/hooks/live/0330-distroforge-net.chroot".to_string(),
             "#!/bin/sh\nset -e\n# DistroForge - permisos del keyfile de red\nchmod 600 /etc/NetworkManager/system-connections/distroforge.nmconnection || true\n".to_string(),
         ));
     }
@@ -217,7 +227,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
                     wallpaper_files.push((format!("livebuild/config/includes.chroot{p}"), c));
                 }
                 wallpaper_files.push((
-                    "livebuild/config/hooks/0300-dconf.hooks.chroot".to_string(),
+                    "livebuild/config/hooks/live/0300-dconf.chroot".to_string(),
                     "#!/bin/sh\nset -e\n# DistroForge - compila la base dconf\ndconf update || true\n".to_string(),
                 ));
             }
@@ -246,7 +256,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
             format!("{}\n", cfg.motd),
         ),
         (
-            "livebuild/config/hooks/0100-distroforge-user.hooks.chroot".to_string(),
+            "livebuild/config/hooks/live/0100-distroforge-user.chroot".to_string(),
             user_hook,
         ),
     ];
@@ -276,7 +286,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         files.push((format!("livebuild/config/includes.chroot{p}"), c));
     }
     files.push((
-        "livebuild/config/hooks/0340-services.hooks.chroot".to_string(),
+        "livebuild/config/hooks/live/0340-services.chroot".to_string(),
         services_hook,
     ));
     files.extend(net_files);
@@ -300,7 +310,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     ));
     if !flatpak_hook.is_empty() {
         files.push((
-            "livebuild/config/hooks/0350-flatpak.hooks.chroot".to_string(),
+            "livebuild/config/hooks/live/0350-flatpak.chroot".to_string(),
             flatpak_hook,
         ));
     }
@@ -323,9 +333,20 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     for (i, hook) in repo_hooks.iter().enumerate() {
         let alias = sanitize_alias(&repos[i].alias, i);
         files.push((
-            format!("livebuild/config/hooks/02{i:02}-repo-{alias}.hooks.chroot"),
+            format!("livebuild/config/hooks/live/02{i:02}-repo-{alias}.chroot"),
             hook.clone(),
         ));
     }
     files
+}
+
+
+/// Doble comilla para la línea de un repo: escapa lo que rompería el shell pero
+/// deja `$SIGNED` sin tocar, porque es una variable que define el propio hook
+/// (`dq` la escaparía y `sq` no expande nada).
+fn dq_repo(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('`', "\\`")
+        .replace('$', "\\$")
 }

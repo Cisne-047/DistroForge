@@ -151,14 +151,18 @@ fn bases_con_repos_preset_generan_hook_apt_con_suite() {
         let hook_path = files
             .keys()
             .find(|p| {
-                // /hooks\/\d+-repo-/
-                let bytes = p.as_bytes();
+                // /hooks/<etapa>/<digitos>-repo-...   (etapa: live o normal)
                 if let Some(pos) = p.find("/hooks/") {
-                    let rest = &p[pos + 7..];
+                    let mut rest = &p[pos + 7..];
+                    if let Some(r) = rest
+                        .strip_prefix("live/")
+                        .or_else(|| rest.strip_prefix("normal/"))
+                    {
+                        rest = r;
+                    }
                     let digits = rest.bytes().take_while(|c| c.is_ascii_digit()).count();
                     digits > 0 && rest[digits..].starts_with("-repo-")
                 } else {
-                    let _ = bytes;
                     false
                 }
             })
@@ -537,7 +541,7 @@ fn livebuild_paquete_flatpak_hook_flathub_y_ficheros() {
         .get("livebuild/config/package-lists/distroforge.list.chroot")
         .unwrap()
         .contains("flatpak"));
-    let hook = files.get("livebuild/config/hooks/0350-flatpak.hooks.chroot").unwrap();
+    let hook = files.get("livebuild/config/hooks/live/0350-flatpak.chroot").unwrap();
     assert!(hook.contains("remote-add --if-not-exists flathub"));
     assert!(hook.contains("org.mozilla.firefox org.videolan.VLC"));
     assert!(files
@@ -719,11 +723,11 @@ fn studio_cfg(base: BaseId) -> DistroConfig {
 fn livebuild_usuarios_extra_hook_servicios_y_autologin_dm() {
     let files = generate_project(&studio_cfg(BaseId::Debian));
     let hook = files
-        .get("livebuild/config/hooks/0100-distroforge-user.hooks.chroot")
+        .get("livebuild/config/hooks/live/0100-distroforge-user.chroot")
         .unwrap();
     assert!(hook.contains("useradd -m -s /bin/bash -G sudo \"ana\""));
     assert!(hook.contains("useradd -m -s /bin/bash \"pepe\""));
-    let svc = files.get("livebuild/config/hooks/0340-services.hooks.chroot").unwrap();
+    let svc = files.get("livebuild/config/hooks/live/0340-services.chroot").unwrap();
     assert!(svc.contains("systemctl enable \"sshd.service\""));
     assert!(svc.contains("systemctl disable \"bluetooth.service\""));
     // escritorio "none" no tiene DM: sin fichero de autologin
@@ -932,7 +936,7 @@ fn firewall_en_paquetes_servicio_y_kickstart() {
         .unwrap()
         .contains("firewalld"));
     assert!(f
-        .get("livebuild/config/hooks/0340-services.hooks.chroot")
+        .get("livebuild/config/hooks/live/0340-services.chroot")
         .unwrap()
         .contains("systemctl enable \"firewalld\""));
     assert!(generate_project(&cfg_for(BaseId::Fedora))
@@ -1061,7 +1065,7 @@ fn grub_timeout_y_parametros_en_los_cuatro_motores() {
     assert!(hook.contains("set timeout=7"));
     assert!(hook.contains("timeout 70"));
     // la ruta importa: live-build solo ejecuta config/hooks/{normal,live}/*.<fase>
-    assert!(!lb.contains_key("livebuild/config/hooks/0900-grub-timeout.hook.binary"));
+    assert!(!lb.contains_key("livebuild/config/hooks/live/0900-grub-timeout.hook.binary"));
     let ks = generate_project(&g(cfg_for(BaseId::Fedora)))
         .get("fedora/ks.cfg")
         .unwrap()
@@ -1122,7 +1126,7 @@ fn livebuild_autostart_firewall_cmd_y_set_default() {
     assert!(f
         .keys()
         .any(|p| p.contains("/.config/autostart/") && p.contains("firefox")));
-    let hook = f.get("livebuild/config/hooks/0340-services.hooks.chroot").unwrap();
+    let hook = f.get("livebuild/config/hooks/live/0340-services.chroot").unwrap();
     assert!(hook.contains("firewall-cmd --permanent --add-service=ssh"));
     assert!(hook.contains("firewall-cmd --permanent --add-port=8080/tcp"));
     assert!(hook.contains("systemctl set-default multi-user.target"));
