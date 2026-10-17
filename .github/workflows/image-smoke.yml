@@ -66,20 +66,37 @@ jobs:
       - name: CLI de instabox
         if: env.INSTABOX_API_KEY != ''
         run: |
-          curl -fsSL https://instabox.sh/install.sh | sudo env INSTABOX_INSTALL_DIR=/usr/local/bin sh
+          # Sin sudo y en un directorio del propio runner: con sudo, el CLI
+          # acababa sin poder escribir su estado (~/.config/instabox).
+          curl -fsSL https://instabox.sh/install.sh | env INSTABOX_INSTALL_DIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          mkdir -p "$HOME/.config/instabox"
           instabox --version
 
       - name: "Crear el sandbox (reintentos: a veces no hay capacidad)"
         if: env.INSTABOX_API_KEY != ''
         run: |
+          # Solo se reintenta si el motivo es la capacidad; cualquier otro error
+          # se muestra tal cual (antes, un fallo de permisos se disfrazaba de
+          # "sin capacidad" y el job tardaba 8 minutos en rendirse).
           for i in $(seq 1 8); do
-            if instabox create --name "$SB" --template universal --timeout 1h --on-timeout kill; then
-              exit 0
-            fi
-            echo "intento $i sin capacidad; espero 60s"
-            sleep 60
+            out=$(instabox create --name "$SB" --template universal --timeout 1h --on-timeout kill 2>&1) && {
+              echo "$out"; exit 0
+            }
+            echo "$out"
+            case "$out" in
+              *no_capacity*)
+                echo "intento $i sin capacidad; espero 60s"
+                sleep 60
+                ;;
+              *)
+                echo "::error::no se pudo crear el sandbox (motivo arriba, no es capacidad)"
+                exit 1
+                ;;
+            esac
           done
-          echo "::error::no se pudo crear el sandbox"
+          echo "::error::no se pudo crear el sandbox tras 8 intentos por falta de capacidad"
           exit 1
 
       - name: Construir la imagen dentro del sandbox

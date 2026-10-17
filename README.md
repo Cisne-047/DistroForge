@@ -89,6 +89,11 @@ cd legacy && npm ci && npm test
 
 El CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) compila y prueba en cada push y PR: núcleo Rust con clippy, backend, UI WASM con `trunk build` + `wasm-opt` y la suite legacy. El deploy a Pages solo corre en `main`.
 
+Hay además dos workflows que no se conforman con compilar:
+
+- [`server-image.yml`](.github/workflows/server-image.yml) publica la imagen del backend en GHCR, con la interfaz dentro.
+- [`image-smoke.yml`](.github/workflows/image-smoke.yml) **ejecuta** esa imagen en un sandbox y comprueba salud, interfaz, estáticos, el 404 en JSON, el registro con sesión y que el contenedor llega a `healthy`. Construir no bastaba: un desajuste de glibc entre compilador y runtime solo se ve al arrancar.
+
 ## Seguridad
 
 Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan kickstart/preseed) y en los enlaces para compartir. Usa una contraseña provisional en cualquier proyecto que vayas a publicar.

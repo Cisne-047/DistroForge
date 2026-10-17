@@ -18,6 +18,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 - **Backend listo para desplegar**: `GET /api/health` para el healthcheck, Dockerfile con la capa de dependencias cacheada, usuario sin privilegios, volumen para el SQLite y `HEALTHCHECK`; `docker-compose.yml`; workflow que publica la imagen en GHCR; y [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) con las opciones de hosting y el aviso sobre cookies entre dominios.
 - **Imagen Docker con la interfaz dentro**, verificada **en ejecución** y no solo construida: así se detectó que el compilador (`rust:1-slim`, glibc 2.39) y el runtime (`debian:bookworm-slim`, 2.36) no coincidían y el binario pedía símbolos inexistentes. Ahora ambas bases son bookworm y el contenedor arranca sin avisos. Incluye cómo probarlo en un sandbox cuando no hay Docker local.
 - **Manual técnico reproducible** (`tools/make_manual.py` → DOCX + PDF): antes el PDF era anterior al rewrite y describía la app React.
+- **Prueba de imagen en CI** (`image-smoke.yml`): construye la imagen y la **ejecuta** en un sandbox, comprobando salud, interfaz, estáticos, 404 en JSON, registro con sesión y `healthy` del contenedor. Sin el secreto de instabox avisa y se queda en verde.
 - **Enlace directo a un paso** (`?paso=N`) para compartir un punto concreto del asistente.
 
 ### Cambiado
