@@ -33,6 +33,7 @@ gallery/              packs comunitarios; la UI los empaqueta en el build
 tools/                scripts de mantenimiento (generación de iconos y del manual)
 docs/                 manual técnico (DOCX + PDF), guía de despliegue y diseño
 project/              ejemplo de proyecto generado
+assets/               imágenes y distintivos del README
 ```
 
 ## Galería comunitaria
@@ -104,3 +105,7 @@ Lo que queda, por orden de importancia:
 - **Firma de paquetes a nivel de sistema**: la auto-actualización ya está (claves propias + manifiesto en el host público), pero quitar los avisos del sistema operativo exige un certificado de pago con identidad verificada, así que los instaladores siguen saliendo sin firmar.
 - **macOS** (`.icns` y firma de código) si alguien lo necesita: la matriz de release es Linux + Windows.
 - **Más pruebas de interfaz**: hoy cubren el arranque, el resumen, la navegación y el paso de construir; falta el resto de pasos y la integración con el backend.
+
+---
+
+<img src="assets/built-with-nan-dark.svg" alt="Built with NaN" width="266" height="104">
