@@ -82,7 +82,8 @@ jobs:
       # esos assets absolutos no existen (ventana en blanco).
       - name: UI (Trunk)
         working-directory: rust/web-ui
-        run: trunk build --release --public-url /
+        run: |
+          for intento in 1 2 3; do             rm -rf dist .stage             if trunk build --release --public-url /; then exit 0; fi             echo "::warning::intento $intento de la interfaz fallido; se reintenta"             sleep 10           done           echo "::error::la interfaz no se construyo tras 3 intentos"           exit 1
 
       - name: Empaquetar (deb + rpm)
         if: matrix.platform == 'ubuntu-22.04'
