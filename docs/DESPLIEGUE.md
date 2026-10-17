@@ -76,6 +76,12 @@ instabox port publish distroforge-docker 8080 --name distroforge   # URL públic
 La clave se gestiona con `instabox keys` y se pasa en `INSTABOX_API_KEY`; no debe
 quedar en el repositorio.
 
+El repositorio lo automatiza en `.github/workflows/image-smoke.yml`: construye la
+imagen y la ejecuta en un sandbox (salud, interfaz, estáticos, 404 de API,
+registro con sesión y estado `healthy` del contenedor). Necesita el secreto
+`INSTABOX_API_KEY` y borra el sandbox al terminar; sin el secreto avisa y se queda
+en verde en lugar de fallar.
+
 Es la forma de detectar problemas que solo aparecen al **ejecutar** el
 contenedor: así salió que compilar en `rust:1-slim` (trixie, glibc 2.39) y
 ejecutar en `debian:bookworm-slim` (2.36) dejaba al binario pidiendo símbolos

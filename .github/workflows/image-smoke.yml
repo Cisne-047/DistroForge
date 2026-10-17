@@ -1,0 +1,136 @@
+name: image-smoke
+
+# Construye la imagen del backend y la EJECUTA en un sandbox de instabox para
+# comprobar que arranca y responde de verdad.
+#
+# Construir no basta: el desajuste de glibc entre el compilador (rust:1-slim) y el
+# runtime (debian:bookworm-slim) solo aparecía al ejecutar el contenedor, y eso
+# pasó desapercibido durante varias rondas porque aquí solo se construía.
+#
+# Necesita el secreto INSTABOX_API_KEY (instabox keys create). Sin él el workflow
+# no falla: avisa y se queda en verde, para no llenar el repositorio de avisos.
+# Cada ejecución usa 1 de los 5 sandboxes de la cuenta y lo borra al terminar
+# (y el propio sandbox se autodestruye a la hora, por si el job muere antes).
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    branches: [main]
+    paths:
+      # solo lo que cambia el comportamiento en ejecución
+      - "rust/server-rs/Dockerfile"
+      - ".github/workflows/image-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
+      INSTABOX_API_URL: https://api.instabox.sh
+      SB: df-smoke-${{ github.run_id }}
+
+    steps:
+      - name: Sin INSTABOX_API_KEY no hay nada que hacer
+        if: env.INSTABOX_API_KEY == ''
+        run: |
+          echo "::notice::No hay secreto INSTABOX_API_KEY; se omite la prueba en sandbox."
+          echo "Crea una clave con 'instabox keys create --name ci --scope machines:read machines:write machines:delete'"
+          echo "y guárdala en Settings → Secrets and variables → Actions como INSTABOX_API_KEY."
+
+      - name: Checkout
+        if: env.INSTABOX_API_KEY != ''
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        if: env.INSTABOX_API_KEY != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Target wasm32
+        if: env.INSTABOX_API_KEY != ''
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Trunk
+        if: env.INSTABOX_API_KEY != ''
+        uses: jetli/trunk-action@v0.5.0
+
+      - name: Interfaz (la imagen la incluye)
+        if: env.INSTABOX_API_KEY != ''
+        working-directory: rust/web-ui
+        run: trunk build --release --public-url /
+
+      - name: CLI de instabox
+        if: env.INSTABOX_API_KEY != ''
+        run: |
+          curl -fsSL https://instabox.sh/install.sh | sudo env INSTABOX_INSTALL_DIR=/usr/local/bin sh
+          instabox --version
+
+      - name: "Crear el sandbox (reintentos: a veces no hay capacidad)"
+        if: env.INSTABOX_API_KEY != ''
+        run: |
+          for i in $(seq 1 8); do
+            if instabox create --name "$SB" --template universal --timeout 1h --on-timeout kill; then
+              exit 0
+            fi
+            echo "intento $i sin capacidad; espero 60s"
+            sleep 60
+          done
+          echo "::error::no se pudo crear el sandbox"
+          exit 1
+
+      - name: Construir la imagen dentro del sandbox
+        if: env.INSTABOX_API_KEY != ''
+        run: |
+          tar czf /tmp/src.tgz rust/server-rs rust/web-ui/dist .dockerignore
+          base64 -w0 /tmp/src.tgz | instabox exec "$SB" --stdin -- \
+            'tr -d "\r\n " | base64 -d > /tmp/src.tgz && mkdir -p ~/df && tar xzf /tmp/src.tgz -C ~/df'
+          instabox exec "$SB" -- 'cd ~/df && docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke .'
+
+      - name: Ejecutar y comprobar de verdad
+        if: env.INSTABOX_API_KEY != ''
+        run: |
+          instabox exec "$SB" -- 'docker run -d --name df -p 8080:8080 -e DF_DB_PATH=/data/df.db distroforge-server:smoke'
+          sleep 10
+          instabox exec "$SB" -- '
+            set -e
+            echo "--- salud ---"
+            curl -fsS localhost:8080/api/health
+            echo
+            echo "--- interfaz y estaticos ---"
+            for p in / /styles.css /gallery/index.json /favicon.png; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "localhost:8080$p")
+              echo "$p -> $code"; test "$code" = 200
+            done
+            wasm=$(curl -s localhost:8080/ | grep -o "web-ui-[a-z0-9]*_bg.wasm" | head -1)
+            test -n "$wasm" || { echo "no encuentro el wasm en el index"; exit 1; }
+            test "$(curl -s -o /dev/null -w "%{http_code}" "localhost:8080/$wasm")" = 200
+            echo "wasm ($wasm) -> 200"
+            echo "--- api desconocida debe ser 404 en json ---"
+            test "$(curl -s -o /dev/null -w "%{http_code}" localhost:8080/api/no-existe)" = 404
+            echo "--- cuentas y sesion por cookie ---"
+            user="ci$RANDOM"
+            curl -fsS -c /tmp/ck -X POST -H "Content-Type: application/json" \
+              -d "{\"name\":\"$user\",\"password\":\"password123\"}" localhost:8080/api/register >/dev/null
+            curl -fsS -b /tmp/ck localhost:8080/api/me | grep -q "$user"
+            curl -fsS localhost:8080/api/testdrive/available
+            echo
+            echo "todas las comprobaciones OK"
+          '
+          echo "--- healthcheck de Docker ---"
+          for i in $(seq 1 10); do
+            st=$(instabox exec "$SB" -- 'docker inspect --format "{{.State.Health.Status}}" df')
+            echo "estado: $st"
+            [ "$st" = "healthy" ] && exit 0
+            sleep 10
+          done
+          echo "::error::el contenedor no llega a healthy"
+          instabox exec "$SB" -- 'docker logs df | tail -20'
+          exit 1
+
+      - name: Borrar el sandbox
+        if: always() && env.INSTABOX_API_KEY != ''
+        run: instabox rm "$SB" || true
