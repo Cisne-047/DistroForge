@@ -6,6 +6,7 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está eti
 
 ### Arreglado
 
+- **Ningún proyecto Debian se construía.** El `auto/config` que generaba DistroForge pasaba `--grub-timeout` a `lb config`, que no acepta esa opción: `lb config` abortaba con `unrecognized option` y el build moría en el primer paso. Lo encontró el primer horneado real de una ISO en CI —los 77 tests comparaban el texto generado, y uno de ellos **consagraba el fallo** (`assert!(auto.contains("--grub-timeout 7"))`)—. Ahora el timeout se aplica con un hook de la fase *binary* sobre el menú ya generado, y el test comprueba el comportamiento.
 - **Galería comunitaria en producción.** La app pedía los packs a `raw.githubusercontent` del propio repositorio, que es privado: el fetch sin token devolvía 404 y la galería no cargaba. Ahora Trunk empaqueta `gallery/` dentro del bundle y la UI la lee por ruta relativa, así que funciona en Pages, en `trunk serve` y en la app de escritorio (que no tiene red).
 - **Empaquetado de escritorio.** El workflow de release nunca se había ejecutado y no podía funcionar: `tauri.conf.json` no tenía sección `bundle` ni iconos, y `beforeBuildCommand` corría desde `rust/tauri-app` (no desde `src-tauri`), así que la ruta relativa a la UI no resolvía.
 - **ZIP sin conexión.** `fflate` se carga desde una copia local (0.8.2, MIT) en lugar de un CDN: el escritorio ya puede generar el zip.

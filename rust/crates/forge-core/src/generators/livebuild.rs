@@ -82,7 +82,7 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
     );
 
     let auto_config = format!(
-        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --grub-timeout {timeout} \\\n    --bootappend-live \"{boot_append}\" \\\n    --bootappend-install \"{boot_install}\" \\\n{di_line}    \"$@\"\n",
+        "#!/bin/sh\nset -e\n# DistroForge - configuracion live-build ({label})\nlb config noauto \\\n    --architectures {lb_arch} \\\n    --distribution {distro} \\\n    --archive-areas \"{areas}\" \\\n    --mirror-bootstrap {mirror} \\\n    --mirror-binary {mirror} \\\n    --binary-images iso-hybrid \\\n    --linux-packages \"linux-image\" \\\n    --linux-flavours {flavour} \\\n    --iso-volume \"{vol}\" \\\n    --bootappend-live \"{boot_append}\" \\\n    --bootappend-install \"{boot_install}\" \\\n{di_line}    \"$@\"\n",
         label = base.label,
         lb_arch = lb_arch,
         distro = distro,
@@ -90,7 +90,6 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         mirror = mirror,
         flavour = flavour,
         vol = slice28(&cfg.name),
-        timeout = js_num(cfg.grub.timeout),
         boot_append = boot_append,
         // `--bootappend-install` SIEMPRE (vacío si no es desatendida); el
         // `--debian-installer live` solo con unattended. El TS mete DOS
@@ -281,6 +280,17 @@ pub fn livebuild_files(cfg: &DistroConfig) -> Vec<(String, String)> {
         services_hook,
     ));
     files.extend(net_files);
+    // live-build no acepta ninguna opción de timeout para GRUB (`--grub-timeout`
+    // no existe: `lb config` aborta con "unrecognized option" y el proyecto no se
+    // construye). Se ajusta el menú ya generado con un hook de la fase binary,
+    // que es donde live-build sí lo permite.
+    files.push((
+        "livebuild/config/hooks/0900-grub-timeout.hook.binary".to_string(),
+        format!(
+            "#!/bin/sh\nset -e\n# DistroForge - timeout del menu GRUB ({t}s)\nfor cfg in binary/boot/grub/grub.cfg binary/boot/grub/config.cfg; do\n  if [ -f \"$cfg\" ]; then\n    sed -i \"s/^set timeout=.*/set timeout={t}/\" \"$cfg\" || true\n  fi\ndone\n",
+            t = js_num(cfg.grub.timeout)
+        ),
+    ));
     if !flatpak_hook.is_empty() {
         files.push((
             "livebuild/config/hooks/0350-flatpak.hooks.chroot".to_string(),

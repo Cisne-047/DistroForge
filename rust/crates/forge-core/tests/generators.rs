@@ -1048,8 +1048,16 @@ fn grub_timeout_y_parametros_en_los_cuatro_motores() {
     };
     let lb = generate_project(&g(cfg_for(BaseId::Debian)));
     let auto = lb.get("livebuild/auto/config").unwrap();
-    assert!(auto.contains("--grub-timeout 7"));
+    // `lb config` no tiene opción de timeout para GRUB: pasarla rompía el build
+    // entero ("unrecognized option '--grub-timeout'"). El timeout se aplica con
+    // un hook de la fase binary sobre el menú ya generado.
+    assert!(!auto.contains("--grub-timeout"));
     assert!(auto.contains("vt.global_cursor_default=0"));
+    let hook = lb
+        .get("livebuild/config/hooks/0900-grub-timeout.hook.binary")
+        .expect("falta el hook que aplica el timeout de GRUB");
+    assert!(hook.contains("set timeout=7"));
+    assert!(hook.contains("binary/boot/grub/grub.cfg"));
     let ks = generate_project(&g(cfg_for(BaseId::Fedora)))
         .get("fedora/ks.cfg")
         .unwrap()
