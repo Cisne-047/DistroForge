@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Permite lanzarlo a mano: útil para comprobar un arreglo sin tener que empujar
+  # un commit de relleno.
+  workflow_dispatch:
 
 jobs:
   rust-core:
