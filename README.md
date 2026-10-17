@@ -7,6 +7,8 @@ Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paq
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 - **Licencia**: MIT para el código; el logotipo queda fuera ([LICENSE](LICENSE))
 
+**Estado: 1.0.0.** Todo lo que promete este README está hecho y comprobado en CI, incluida una ISO real que se hornea y arranca en cada release. Las limitaciones conocidas (firma de sistema, macOS y el host del backend) están al final, en el roadmap.
+
 Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI, el backend con Test Drive VNC (`axum`) y la app de escritorio (Tauri 2). La app React/TS original y el backend Node viven en `legacy/` como referencia y suite de paridad.
 
 ## Qué genera
@@ -102,9 +104,7 @@ Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan
 
 Lo que queda, por orden de importancia:
 
-- **Hosting permanente del backend con URL por defecto.** El despliegue está automatizado (Fly con `FLY_API_TOKEN`) y verificado en ejecución, pero la URL pública sigue siendo efímera: o se le da un host fijo, o la UI tendrá que seguir pidiéndola.
+- **Un host propio para el backend.** Hoy vive en un sandbox y su URL por defecto está horneada en la app web. El despliegue a un host fijo está automatizado (Fly con `FLY_API_TOKEN`): es cambiar la variable del repositorio y la `endpoints` del updater.
 - **Firma de paquetes a nivel de sistema**: la auto-actualización ya está (claves propias + manifiesto en el host público), pero quitar los avisos del sistema operativo exige un certificado de pago con identidad verificada, así que los instaladores siguen saliendo sin firmar.
 - **macOS** (`.icns` y firma de código) si alguien lo necesita: la matriz de release es Linux + Windows.
-- **Una ISO real de punta a punta en CI.** El núcleo genera las recetas y las valida (77 tests) y los workflows generados se comprueban como YAML, pero ninguna ISO se hornea en CI: es el hueco de verificación más grande que queda, y el más caro de cerrar.
-- **Pruebas de interfaz**: hoy la UI solo se compila y se construye.
-- **Modo claro** de *Grafito & Verde*: los tokens están agrupados para que sea cambiar un bloque de color, pero aún no existe.
+- **Más pruebas de interfaz**: hoy cubren el arranque, el resumen, la navegación y el paso de construir; falta el resto de pasos y la integración con el backend.

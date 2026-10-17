@@ -110,7 +110,7 @@ El orden de prioridad al resolver el servidor es:
 | `QEMU_BIN` | `qemu-system-x86_64` | Binario de QEMU para el Test Drive |
 | `DF_WEB_DIR` | — | Directorio con la interfaz web compilada; si existe, se sirve en el mismo origen que la API |
 
-Comprobación rápida: `GET /api/health` → `{"status":"ok","service":"distroforge-server","version":"0.5.0"}`.
+Comprobación rápida: `GET /api/health` → `{"status":"ok","service":"distroforge-server","version":"1.0.0"}`.
 
 ## Imagen
 

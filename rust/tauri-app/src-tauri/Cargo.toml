@@ -1,6 +1,6 @@
 [package]
 name = "forge-tauri"
-version = "0.5.1"
+version = "1.0.0"
 edition = "2021"
 description = "Scaffold de versión de escritorio de DistroForge (Tauri 2 + forge-core)"
 license = "MIT"

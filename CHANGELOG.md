@@ -1,7 +1,29 @@
 # Historial de cambios
 
-Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.5.0 todavía **no está etiquetada**: este es el trabajo acumulado en `main` desde la v0.4.0.
+Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su etiqueta, con los paquetes firmados y la ISO construida y arrancada en CI.
 
+## [1.0.0] - 2026-10-17
+
+Primera versión estable. Lo que la hace 1.0 no es una función nueva, sino que todo
+lo que promete el README está hecho **y comprobado**:
+
+- La app web y la de escritorio generan proyectos para 14 bases y 4 motores, con 8
+  formatos de salida. El núcleo pasa 80 tests y la suite de paridad con la app
+  React original sigue en verde.
+- **Una ISO real se hornea y arranca en CI** en cada release: estructura (El
+  Torito), contenido (lo configurado dentro del squashfs) y arranque en QEMU, con
+  la ISO como artefacto descargable.
+- **Auto-actualización** de la app de escritorio, con paquetes firmados con claves
+  propias y el manifiesto servido en un host público. Verificado descargando el
+  paquete publicado y validando su firma con la clave pública.
+- **Pruebas de interfaz** con navegador real sobre la aplicación construida.
+- **Backend desplegado** —cuentas, galería compartida y Test Drive con QEMU— y la
+  URL por defecto horneada en la app web.
+
+Limitaciones conocidas, dichas claramente: los instaladores **no están firmados a
+nivel de sistema** (requiere un certificado de pago con identidad verificada), no
+hay build de **macOS** (requiere cuenta de Apple) y el backend vive en un
+**sandbox**, así que su URL depende de que siga en pie.
 ## [0.5.1] - 2026-10-17
 
 ### Arreglado

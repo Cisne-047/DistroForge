@@ -1,6 +1,6 @@
 [package]
 name = "forge-wasm"
-version = "0.5.1"
+version = "1.0.0"
 edition = "2021"
 description = "Binding wasm-bindgen del núcleo de DistroForge para la web app"
 license = "MIT"
