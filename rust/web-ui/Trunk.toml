@@ -3,6 +3,11 @@
     public_url = "/DistroForge/"
 target = "index.html"
 dist = "dist"
+    # wasm-opt de Trunk 0.19 es Binaryen 116 y no sabe leer los opcodes que
+    # emiten los Rust recientes ("invalid code after misc prefix"): el job `ui`
+    # fallaba o no según la imagen del runner. Sin wasm-opt el build es
+    # determinista (el .wasm pesa ~10 % más y no se nota al cargar).
+    wasm-opt = false
 
 [serve]
 address = "127.0.0.1"
