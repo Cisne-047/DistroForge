@@ -21,6 +21,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use forge_core::types::DistroConfig;
+use tauri_plugin_updater::UpdaterExt;
 
 fn parse_config(cfg_json: &str) -> Result<DistroConfig, String> {
     serde_json::from_str(cfg_json).map_err(|e| format!("config inválida: {e}"))
@@ -44,7 +45,39 @@ fn validate(cfg_json: String) -> Result<Vec<String>, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![generate_project, validate])
+        .setup(|app| {
+            // Auto-actualización: al arrancar se pregunta si hay versión nueva y,
+            // si la hay, se instala y la app se reinicia sola. Nunca debe impedir
+            // abrir: si no hay red, el endpoint no responde o la firma no cuadra,
+            // se avisa por consola y se sigue.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let updater = match handle.updater() {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("updater no disponible: {e}");
+                        return;
+                    }
+                };
+                match updater.check().await {
+                    Ok(Some(update)) => {
+                        let version = update.version.clone();
+                        match update.download_and_install(|_, _| {}, || {}).await {
+                            Ok(()) => {
+                                println!("actualizado a {version}; reiniciando");
+                                handle.restart();
+                            }
+                            Err(e) => eprintln!("no se pudo instalar {version}: {e}"),
+                        }
+                    }
+                    Ok(None) => println!("sin actualizaciones"),
+                    Err(e) => eprintln!("no se pudo comprobar actualizaciones: {e}"),
+                }
+            });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

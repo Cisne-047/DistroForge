@@ -13,3 +13,7 @@ forge-core = { path = "../../crates/forge-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
+# Auto-actualización: mira si hay versión nueva al arrancar, la instala y
+# reinicia. La firma de los paquetes a nivel de sistema (Windows/macOS) necesita
+# un certificado de pago; esto es independiente y funciona con claves propias.
+tauri-plugin-updater = "2"

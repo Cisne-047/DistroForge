@@ -103,7 +103,7 @@ Las contraseñas viajan en claro dentro de las recetas generadas (así funcionan
 Lo que queda, por orden de importancia:
 
 - **Hosting permanente del backend con URL por defecto.** El despliegue está automatizado (Fly con `FLY_API_TOKEN`) y verificado en ejecución, pero la URL pública sigue siendo efímera: o se le da un host fijo, o la UI tendrá que seguir pidiéndola.
-- **Firma de los paquetes de escritorio y auto-actualización** (`tauri-plugin-updater`): hoy se publican sin firmar y sin actualizaciones.
+- **Firma de paquetes a nivel de sistema**: la auto-actualización ya está (claves propias + manifiesto en el host público), pero quitar los avisos del sistema operativo exige un certificado de pago con identidad verificada, así que los instaladores siguen saliendo sin firmar.
 - **macOS** (`.icns` y firma de código) si alguien lo necesita: la matriz de release es Linux + Windows.
 - **Una ISO real de punta a punta en CI.** El núcleo genera las recetas y las valida (77 tests) y los workflows generados se comprueban como YAML, pero ninguna ISO se hornea en CI: es el hueco de verificación más grande que queda, y el más caro de cerrar.
 - **Pruebas de interfaz**: hoy la UI solo se compila y se construye.
