@@ -192,10 +192,16 @@ jobs:
           fi
           printf 'Adjuntando %d paquetes:\n' "${#paquetes[@]}"
           printf '  %s\n' "${paquetes[@]}"
-          gh release create "$GITHUB_REF_NAME" \
-            --title "DistroForge $GITHUB_REF_NAME" \
-            --generate-notes \
-            "${paquetes[@]}"
+          # Idempotente: un reintento del job no debe morir porque la release ya
+          # existe (pasó al reintentar el 17/10).
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --clobber "${paquetes[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "DistroForge $GITHUB_REF_NAME" \
+              --generate-notes \
+              "${paquetes[@]}"
+          fi
       # Auto-actualización: el manifiesto que consulta la app al arrancar. El
       # release vive en un repositorio privado y la app no puede leerlo, así que el
       # manifiesto y los paquetes se publican en el host público que ya sirve el
@@ -223,7 +229,7 @@ jobs:
           plataformas = {}
           def firma(p):
               return open(p, encoding="utf-8").read().strip()
-          for pat, clave in (("dist/**/*-setup.exe", "windows-x86_64"), ("dist/**/*.AppImage", "linux-x86_64")):
+          for pat, clave in (("dist/**/*-setup.exe", "windows-x86_64"), ("dist/**/*.AppImage.tar.gz", "linux-x86_64"), ("dist/**/*.AppImage", "linux-x86_64")):
               for fichero in glob.glob(pat, recursive=True):
                   s = fichero + ".sig"
                   if os.path.exists(s):
@@ -245,9 +251,10 @@ jobs:
 
           # Los paquetes los descarga el propio sandbox con un token de un solo uso
           # (evita mover decenas de MB por la CLI).
-          for fichero in $(find dist -type f \( -name '*-setup.exe' -o -name '*.AppImage' \) | sort); do
+          for fichero in $(find dist -type f \( -name '*-setup.exe' -o -name '*.AppImage.tar.gz' -o -name '*.AppImage' \) | sort); do
             nombre=$(basename "$fichero")
-            url=$(gh release view "$GITHUB_REF_NAME" --json assets --jq ".assets[] | select(.name==\"$nombre\") | .url")
+            url=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq ".assets[] | select(.name==\"$nombre\") | .url")
+            echo "-> $nombre  ($url)"
             if [ -z "$url" ]; then echo "::warning::$nombre no está en el release"; continue; fi
             instabox exec "$SB" --env GH_TOKEN="$GH_TOKEN" -- "curl -fsSL -H 'Authorization: Bearer \$GH_TOKEN' -H 'Accept: application/octet-stream' -L -o /tmp/$nombre '$url' && docker cp /tmp/$nombre df:/app/web/updates/$nombre && echo subido $nombre"
           done
