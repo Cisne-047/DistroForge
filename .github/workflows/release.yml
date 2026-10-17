@@ -251,13 +251,21 @@ jobs:
           instabox exec "$SB" -- 'docker exec df mkdir -p /app/web/updates'
           base64 -w0 /tmp/latest.json | instabox exec "$SB" --stdin -- 'base64 -d > /tmp/latest.json && docker cp /tmp/latest.json df:/app/web/updates/latest.json && echo manifiesto publicado'
 
-          # Los paquetes los descarga el propio sandbox con un token de un solo uso
-          # (evita mover decenas de MB por la CLI).
+          # Los paquetes se suben por trozos desde el runner. Antes los bajaba el
+          # propio sandbox desde GitHub con un token, pero daba 401 (el token no
+          # llegaba al curl dentro del sandbox) y la release se quedaba sin
+          # paquetes que actualizar. Trocear es feo pero es lo que **he verificado
+          # a mano** tres veces: el `stdin` de la CLI corta en 1 MB, así que van
+          # partes de 900 000 caracteres en base64.
           for fichero in $(find dist -type f \( -name '*-setup.exe' -o -name '*.AppImage.tar.gz' -o -name '*.AppImage' \) | sort); do
             nombre=$(basename "$fichero")
-            url=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq ".assets[] | select(.name==\"$nombre\") | .url")
-            echo "-> $nombre  ($url)"
-            if [ -z "$url" ]; then echo "::warning::$nombre no está en el release"; continue; fi
-            instabox exec "$SB" --env GH_TOKEN="$GH_TOKEN" -- "curl -fsSL -H 'Authorization: Bearer \$GH_TOKEN' -H 'Accept: application/octet-stream' -L -o /tmp/$nombre '$url' && docker cp /tmp/$nombre df:/app/web/updates/$nombre && echo subido $nombre"
+            echo "-> $nombre ($(du -h "$fichero" | cut -f1))"
+            instabox exec "$SB" -- 'rm -f /tmp/paquete.b64'
+            base64 -w0 "$fichero" | split -b 900000 - /tmp/trozo-
+            for trozo in /tmp/trozo-*; do
+              cat "$trozo" | instabox exec "$SB" --stdin -- 'tr -d "\r\n " >> /tmp/paquete.b64'
+            done
+            rm -f /tmp/trozo-*
+            instabox exec "$SB" --timeout 300 -- "tr -d '\r\n ' < /tmp/paquete.b64 | base64 -d > /tmp/$nombre && docker cp /tmp/$nombre df:/app/web/updates/$nombre && echo subido $nombre"
           done
           echo "actualizaciones publicadas en ${BASE}latest.json"
