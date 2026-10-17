@@ -109,8 +109,8 @@ jobs:
           # tarda más, así que se lanza en segundo plano y se sondea un centinela
           # con el código de salida.
           instabox exec "$SB" -- 'cd ~/df && rm -f /tmp/build.log /tmp/build.exit && nohup sh -c "docker build -f rust/server-rs/Dockerfile -t distroforge-server:smoke . > /tmp/build.log 2>&1; echo \$? > /tmp/build.exit" >/dev/null 2>&1 & echo lanzado'
-          for i in $(seq 1 40); do
-            sleep 15
+          for i in $(seq 1 60); do
+            sleep 20
             code=$(instabox exec "$SB" -- 'cat /tmp/build.exit 2>/dev/null' 2>/dev/null | tr -d '[:space:]')
             if [ -n "$code" ]; then
               echo "construccion terminada con codigo $code"

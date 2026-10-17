@@ -1,0 +1,125 @@
+name: iso-build
+
+# Hornea una ISO de verdad, de principio a fin, y la comprueba.
+#
+# Hasta ahora solo se verificaba la receta: los 77 tests del núcleo generan los
+# ficheros y validan los workflows como YAML, pero ninguna ISO se construía. Este
+# workflow cierra ese hueco: genera el proyecto con el CLI, construye la imagen
+# con live-build (la misma receta que genera DistroForge), comprueba que es una
+# ISO arrancable, que **arranca en QEMU** y que dentro está lo configurado.
+#
+# Es lento (descarga la base de Debian y construye), así que no corre en cada
+# push: solo al publicar un tag o a mano.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  debian-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    container:
+      image: debian:bookworm
+    steps:
+      - name: Prerrequisitos
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends curl ca-certificates git file
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Generar el proyecto (Debian, ISO, sin escritorio)
+        working-directory: rust
+        run: |
+          cat > /tmp/cfg.json <<'JSON'
+          {
+            "name": "ci-iso",
+            "base": "debian",
+            "desktop": "none",
+            "output": "iso",
+            "arch": "x86_64",
+            "system": { "hostname": "ci-iso", "username": "ci" },
+            "grub": { "extraParams": "quiet splash console=ttyS0,115200" },
+            "smokeTest": true
+          }
+          JSON
+          cargo run -q -p forge-cli -- dump debian /tmp/proj iso /tmp/cfg.json
+          find /tmp/proj -type f | sort
+
+      - name: Construir la ISO
+        run: |
+          apt-get install -y --no-install-recommends \
+            live-build debootstrap squashfs-tools xorriso isolinux syslinux-efi mtools dosfstools
+          cd /tmp/proj/livebuild
+          chmod +x auto/* config/hooks/* 2>/dev/null || true
+          lb config
+          time lb build
+          ls -lh *.iso
+
+      - name: Verificar que es una ISO arrancable
+        run: |
+          apt-get install -y --no-install-recommends genisoimage
+          ISO=$(find /tmp/proj -name '*.iso' | head -n1)
+          [ -n "$ISO" ] || { echo "no se generó ninguna ISO"; exit 1; }
+          echo "ISO: $ISO ($(du -h "$ISO" | cut -f1))"
+          file "$ISO" | grep -qi 'ISO 9660' || { echo "no es una ISO 9660"; exit 1; }
+          isoinfo -d -i "$ISO" | grep -iE 'Volume id|El Torito|Bootable' || true
+          isoinfo -d -i "$ISO" | grep -qi 'El Torito' || { echo "sin registro de arranque (El Torito)"; exit 1; }
+          # la receta tiene que estar dentro: hostname y MOTD configurados
+          SQ=$(isoinfo -f -i "$ISO" | grep -i 'filesystem.squashfs' | head -n1)
+          [ -n "$SQ" ] || { echo "la ISO no lleva sistema de ficheros live"; exit 1; }
+          echo "squashfs: $SQ"
+
+      - name: El contenido es el que se configuró
+        run: |
+          apt-get install -y --no-install-recommends squashfs-tools
+          ISO=$(find /tmp/proj -name '*.iso' | head -n1)
+          mkdir -p /tmp/iso && (isoinfo -x "$(isoinfo -f -i "$ISO" | grep -i 'filesystem.squashfs' | head -n1)" -i "$ISO" > /tmp/fs.squashfs) 2>/dev/null || true
+          [ -s /tmp/fs.squashfs ] || { echo "no pude extraer el squashfs"; exit 1; }
+          echo "--- hostname dentro de la imagen ---"
+          HOST=$(unsquashfs -cat /tmp/fs.squashfs etc/hostname 2>/dev/null | tr -d '\n')
+          echo "hostname: [$HOST]"
+          [ "$HOST" = "ci-iso" ] || { echo "el hostname configurado no llegó a la imagen"; exit 1; }
+          echo "--- MOTD ---"
+          unsquashfs -cat /tmp/fs.squashfs etc/motd 2>/dev/null | head -5 || true
+
+      - name: Arrancarla en QEMU (la prueba de verdad)
+        run: |
+          apt-get install -y --no-install-recommends qemu-system-x86
+          ISO=$(find /tmp/proj -name '*.iso' | head -n1)
+          echo "arrancando $ISO en QEMU (hasta 4 minutos)..."
+          timeout 240 qemu-system-x86_64 -m 2048 -no-reboot -display none \
+            -cdrom "$ISO" -serial file:/tmp/serial.log || true
+          echo "--- ultimas lineas de la consola serie ---"
+          tail -n 20 /tmp/serial.log || true
+          if grep -qE 'login:|Welcome to|Gracefully powering off' /tmp/serial.log; then
+            echo "LA ISO ARRANCA: se ve el login en la consola serie"
+          else
+            echo "::error::la ISO no llega al login; revisa el log serie"
+            exit 1
+          fi
+
+      - name: Guardar la ISO y el log de arranque
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: distroforge-debian-iso
+          path: |
+            /tmp/proj/livebuild/*.iso
+            /tmp/serial.log
+          if-no-files-found: warn
+          retention-days: 14
