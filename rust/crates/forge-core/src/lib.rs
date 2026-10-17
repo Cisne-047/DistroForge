@@ -23,6 +23,8 @@
 //! ids son enums cerrados, de modo que estados "imposibles" del TS (base
 //! desconocida que haría saltar `baseById`) no pueden existir en Rust.
 
+#![forbid(unsafe_code)]
+
 pub mod catalog;
 pub mod generators;
 pub mod security;

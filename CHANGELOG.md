@@ -16,6 +16,10 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
 - **Solo queda Rust**: se elimina el código heredado (la app React/TS y el backend
   Node) y su job de CI. El repositorio contiene únicamente la implementación
   actual: núcleo, CLI, UI Leptos/WASM, backend axum y app de escritorio Tauri.
+- **Rendimiento**: el perfil `release` del núcleo y del backend usa LTO fino y una
+  sola unidad de código; `to_hex` ya no formatea byte a byte; el servidor purga
+  sesiones caducadas al crear una nueva; la búsqueda de packs no puede hacer
+  `panic!` en la ruta de petición (devuelve vacío si SQLite fallara).
 
 ### Seguridad
 
@@ -39,6 +43,12 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su
   workflows declaran permisos mínimos, los secretos se limitan al step que los usa,
   `flyctl` queda fijado a un commit y se validan el tag de release y los nombres de
   paquete antes de usarlos en comandos.
+- **Sin `unsafe` en ninguna crate**: `#![forbid(unsafe_code)]` en `forge-core`,
+  `forge-cli`, `forge-wasm`, `server-rs`, `web-ui` y `tauri-app`, de modo que una
+  regresión no puede colar memoria insegura sin romper la compilación.
+- **Test Drive**: todos los candados de sesiones toleran envenenamiento (un pánico
+  pasado ya no deja la función muerta) y el contador de displays da la vuelta en vez
+  de desbordar el puerto VNC.
 
 ## [1.0.0] - 2026-10-17
 

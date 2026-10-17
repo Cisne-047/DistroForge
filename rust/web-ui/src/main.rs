@@ -12,6 +12,8 @@
 //! - `packs`: modpacks (port de `src/packs.ts`) + galería
 //! - `util`: interop con el navegador (zip, ficheros, clipboard, fetch)
 
+#![forbid(unsafe_code)]
+
 mod app;
 mod packs;
 mod server;

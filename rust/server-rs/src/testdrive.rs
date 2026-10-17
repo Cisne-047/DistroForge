@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::process::{Child, Command};
@@ -24,6 +24,13 @@ fn now_ms() -> i64 {
 }
 
 type ChildCell = Arc<Mutex<Option<Child>>>;
+type SessionMap = HashMap<String, Arc<DriveSession>>;
+
+/// Candado tolerante a envenenamiento: un pánico pasado no debe dejar el Test
+/// Drive inutilizable para siempre.
+fn lock_sessions(sessions: &Mutex<SessionMap>) -> MutexGuard<'_, SessionMap> {
+    sessions.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 pub struct DriveSession {
     pub id: String,
@@ -90,10 +97,7 @@ impl DriveManager {
 
     pub fn list_for(&self, owner: &str) -> Vec<(String, i64)> {
         self.sweep();
-        self.0
-            .sessions
-            .lock()
-            .expect("lock sessions")
+        lock_sessions(&self.0.sessions)
             .values()
             .filter(|s| s.owner == owner)
             .map(|s| (s.id.clone(), s.expires))
@@ -109,7 +113,9 @@ impl DriveManager {
         mem_mb: u32,
     ) -> Result<Arc<DriveSession>, String> {
         self.sweep();
-        let display = self.0.next_display.fetch_add(1, Ordering::SeqCst);
+        // Vueltas acotadas: el contador es u32 y `5900 + display` debe caber
+        // en un puerto válido aunque el servidor viva meses.
+        let display = 100 + self.0.next_display.fetch_add(1, Ordering::SeqCst) % 500;
         let vnc_port = vnc_port_for(display);
         let child = Command::new(&self.0.qemu_bin)
             .arg("-m")
@@ -133,11 +139,7 @@ impl DriveManager {
             child: child_cell.clone(),
             expires: now_ms() + self.0.ttl_ms,
         });
-        self.0
-            .sessions
-            .lock()
-            .expect("lock sessions")
-            .insert(session.id.clone(), session.clone());
+        lock_sessions(&self.0.sessions).insert(session.id.clone(), session.clone());
         // al morir QEMU se elimina la sesión
         let manager = self.clone();
         let id = session.id.clone();
@@ -168,12 +170,7 @@ impl DriveManager {
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<DriveSession>> {
-        self.0
-            .sessions
-            .lock()
-            .expect("lock sessions")
-            .get(id)
-            .cloned()
+        lock_sessions(&self.0.sessions).get(id).cloned()
     }
 
     pub fn stop(&self, id: &str) -> bool {
@@ -193,11 +190,7 @@ impl DriveManager {
     /// Mata las sesiones caducadas.
     pub fn sweep(&self) {
         let now = now_ms();
-        let expired: Vec<String> = self
-            .0
-            .sessions
-            .lock()
-            .expect("lock sessions")
+        let expired: Vec<String> = lock_sessions(&self.0.sessions)
             .iter()
             .filter(|(_, s)| s.expires <= now)
             .map(|(id, _)| id.clone())
@@ -213,4 +206,31 @@ impl DriveManager {
 pub fn is_absolute_path(p: &str) -> bool {
     let path = Path::new(p);
     path.is_absolute() || path.has_root()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn el_candado_se_recupera_de_un_panico_previo() {
+        let m = Mutex::new(SessionMap::new());
+        let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _g = m.lock().unwrap();
+            panic!("pánico simulado");
+        }));
+        assert!(poisoned.is_err());
+        assert!(m.is_poisoned());
+        // El servicio sigue usando el mapa en vez de quedarse muerto.
+        assert!(lock_sessions(&m).is_empty());
+    }
+
+    #[test]
+    fn el_display_da_la_vuelta_sin_salirse_de_rango() {
+        // El contador es u32: tras miles de millones de sesiones la suma debe
+        // seguir entrando en un puerto VNC (100..=599 → 6000..=6499).
+        let display = 100 + u32::MAX % 500;
+        assert!((100..=599).contains(&display));
+        assert!((6000..=6499).contains(&vnc_port_for(display)));
+    }
 }

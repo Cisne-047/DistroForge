@@ -9,3 +9,9 @@ members = [
 # se compila aparte (`cargo build` dentro de rust/tauri-app/src-tauri); se
 # excluye del workspace para que test/build/check del core no lo toquen.
 exclude = ["tauri-app"]
+
+# forge-core es la ruta caliente (generar un proyecto entero en el navegador o
+# en el CLI): LTO fino le da un plus sin disparar el tiempo de compilación.
+[profile.release]
+lto = "thin"
+codegen-units = 1

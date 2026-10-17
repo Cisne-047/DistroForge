@@ -13,6 +13,8 @@
 //!
 //! Sin clap: los argumentos se leen a mano con `std::env` para minimizar deps.
 
+#![forbid(unsafe_code)]
+
 use std::fs;
 use std::path::Path;
 use std::process::exit;

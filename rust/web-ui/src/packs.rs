@@ -183,11 +183,8 @@ fn slugify(name: &str) -> String {
 /// inválido. Port de `parsePack`.
 pub fn parse_pack(raw: &str) -> Result<Pack, String> {
     let obj: serde_json::Value = serde_json::from_str(raw).map_err(|e| e.to_string())?;
-    let p = if obj.get("pack").is_some() {
-        obj.get("pack").unwrap()
-    } else {
-        &obj
-    };
+    // `{"pack": {...}}` o el objeto suelto; `{"pack": null}` cae en el genérico.
+    let p = obj.get("pack").unwrap_or(&obj);
     let bad = || "el pack debe ser JSON con name y packages[]".to_string();
     let name = p
         .get("name")

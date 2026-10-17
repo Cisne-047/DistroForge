@@ -17,3 +17,7 @@ rust/web-ui/dist-tunnel/
 tests/ui/node_modules/
 tests/ui/test-results/
 tests/ui/playwright-report/
+
+# app Tauri: artefactos de `cargo check`/`cargo build` y esquemas generados
+rust/tauri-app/src-tauri/target/
+rust/tauri-app/src-tauri/gen/schemas/

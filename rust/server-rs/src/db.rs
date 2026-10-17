@@ -93,11 +93,11 @@ pub fn search_packs(db: &Connection, query: &str, limit: i64) -> Vec<PackRow> {
             .prepare(&format!(
                 "SELECT {PACK_COLS} FROM packs ORDER BY id DESC LIMIT ?1"
             ))
-            .expect("prepare all")
-            .query_map([limit], row_to_pack)
-            .expect("query all")
-            .filter_map(Result::ok)
-            .collect();
+            .and_then(|mut stmt| {
+                stmt.query_map([limit], row_to_pack)
+                    .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
+            })
+            .unwrap_or_default();
     }
     let safe: String = q
         .chars()
@@ -136,11 +136,11 @@ pub fn search_packs(db: &Connection, query: &str, limit: i64) -> Vec<PackRow> {
                  WHERE name LIKE ?1 ESCAPE '\\' OR desc LIKE ?1 ESCAPE '\\'
                  ORDER BY id DESC LIMIT ?2"
             ))
-            .expect("prepare like")
-            .query_map(rusqlite::params![format!("%{like}%"), limit], row_to_pack)
-            .expect("query like")
-            .filter_map(Result::ok)
-            .collect()
+            .and_then(|mut stmt| {
+                stmt.query_map(rusqlite::params![format!("%{like}%"), limit], row_to_pack)
+                    .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
+            })
+            .unwrap_or_default()
         }
     }
 }

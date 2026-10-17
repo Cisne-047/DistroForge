@@ -23,3 +23,11 @@ futures-util = "0.3"
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+
+# El servidor es el artefacto que más importa en producción: LTO y una sola
+# unidad de código cuestan unos segundos de build y dan un binario más rápido
+# y bastante más pequeño (menos capas que descargar en la imagen).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

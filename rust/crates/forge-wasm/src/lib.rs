@@ -4,6 +4,8 @@
 //! No hace falta compilar a `wasm32` para verificarlo: `cargo check -p
 //! forge-wasm` en host es suficiente (wasm-bindgen compila en host con stubs).
 
+#![forbid(unsafe_code)]
+
 use wasm_bindgen::prelude::*;
 
 use forge_core::generators::{generate_project as core_generate, validate as core_validate};

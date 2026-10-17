@@ -9,6 +9,8 @@
 //!                sesión viaja y no hace falta configurar la URL en la app); si
 //!                no existe, es una API pura.
 
+#![forbid(unsafe_code)]
+
 use std::time::Duration;
 
 use distroforge_server::testdrive::DriveManager;

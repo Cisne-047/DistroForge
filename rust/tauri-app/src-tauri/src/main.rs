@@ -18,6 +18,7 @@
 //! Nota: `expect` en `main` es código de aplicación (arranque), no ruta de
 //! librería; la regla "sin unwrap" aplica al core.
 
+#![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use forge_core::types::DistroConfig;

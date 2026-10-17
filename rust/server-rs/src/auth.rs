@@ -14,9 +14,11 @@ fn scrypt_params() -> Params {
 }
 
 pub fn to_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        s.push_str(&format!("{b:02x}"));
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
     }
     s
 }
@@ -107,6 +109,9 @@ pub fn find_user(db: &Connection, name: &str) -> Option<FoundUser> {
 
 /// Crea una sesión y devuelve el token (guárdalo en cookie).
 pub fn create_session(db: &Connection, user_id: i64) -> rusqlite::Result<String> {
+    // Purga perezosa: en un servidor de larga vida las sesiones caducadas no
+    // deben acumularse solo porque no se reinicia el proceso.
+    let _ = db.execute("DELETE FROM sessions WHERE expires < datetime('now')", []);
     let token = random_token();
     db.execute(
         &format!(
