@@ -57,6 +57,7 @@ jobs:
       - name: Validar entradas y preparar el script remoto
         if: env.HAS_INSTABOX == 'true'
         env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
           SB: ${{ inputs.machine }}
           IMAGE: ${{ inputs.image }}
           CNAME: ${{ inputs.container }}
