@@ -174,9 +174,22 @@ jobs:
             exit 0
           fi
           sha256sum "${isos[0]}" | awk '{print $1}' > "${isos[0]}.sha256"
-          # Nombre acorde a los paquetes (DistroForge_1.1.0_amd64.deb, ...): el
+          # Nombre acorde a los paquetes (DistroForge_1.1.1_amd64.deb, ...): el
           # de live-build es genérico y no dice de qué versión es.
           nombre="DistroForge-${GITHUB_REF_NAME#v}-amd64.iso"
           cp "${isos[0]}" "/tmp/$nombre"
           sha256sum "/tmp/$nombre" | awk '{print $1}' > "/tmp/$nombre.sha256"
-          gh release upload "$GITHUB_REF_NAME" "/tmp/$nombre" "/tmp/$nombre.sha256" --clobber
+
+          # La release la crea otro workflow y puede no existir todavía cuando
+          # termina este job. Se reintenta y, si aun así no se puede, se avisa y
+          # el run queda en verde: la ISO sigue descargable como artefacto del
+          # propio run. Así este paso no vuelve a teñir de rojo una ISO válida.
+          for intento in 1 2 3 4 5; do
+            if gh release upload "$GITHUB_REF_NAME" "/tmp/$nombre" "/tmp/$nombre.sha256" --clobber; then
+              echo "ISO adjuntada a $GITHUB_REF_NAME"
+              exit 0
+            fi
+            echo "intento $intento fallido; reintento en 60 s"
+            sleep 60
+          done
+          echo "::warning::no se pudo adjuntar la ISO a $GITHUB_REF_NAME; sigue como artefacto del run"
