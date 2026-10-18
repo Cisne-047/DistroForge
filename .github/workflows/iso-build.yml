@@ -152,6 +152,9 @@ jobs:
 
       - name: Adjuntar la ISO a la release (solo al lanzar sobre un tag)
         if: always() && startsWith(github.ref, 'refs/tags/')
+        # El job corre dentro de debian:bookworm, donde el shell por defecto es
+        # `sh` y no existen `shopt` ni los arrays: sin esto el step moría con 127.
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
