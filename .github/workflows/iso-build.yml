@@ -157,7 +157,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Sin GH_REPO, `gh` resuelve el repositorio llamando a `git` sobre el
+          # workspace, que en el contenedor pertenece a otro UID y git lo rechaza
+          # ("dubious ownership"). Con GH_REPO no hay que adivinar nada.
+          GH_REPO: ${{ github.repository }}
         run: |
+          # El workspace lo creó otro UID (el runner), así que git se queja al
+          # mirarlo desde el contenedor; no afecta a la subida, pero calla el ruido.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" 2>/dev/null || true
           # La ISO ya está validada (El Torito, contenido y arranque en QEMU);
           # adjuntarla a la release la hace descargable como el resto de paquetes.
           shopt -s nullglob
