@@ -3,7 +3,7 @@ name = "distroforge-server"
 version = "1.1.0"
 edition = "2021"
 description = "Servidor DistroForge en Rust (réplica del backend Node/Fastify)"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 # Proyecto INDEPENDIENTE: no pertenece al workspace de rust/Cargo.toml.
 [workspace]

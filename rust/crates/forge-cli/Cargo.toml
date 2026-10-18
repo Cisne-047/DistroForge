@@ -3,7 +3,7 @@ name = "forge-cli"
 version = "1.1.0"
 edition = "2021"
 description = "CLI `forge` de DistroForge: vuelca a disco el proyecto generado (equivalente a scripts/dump.ts)"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "forge"

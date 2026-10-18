@@ -5,7 +5,7 @@ Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paq
 - **App web**: <https://cisne-047.github.io/DistroForge/>
 - **App de escritorio**: `.deb`, `.rpm`, `.AppImage`, `.msi` y `.exe` en [Releases](../../releases)
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
-- **Licencia**: MIT para el código; el logotipo queda fuera ([LICENSE](LICENSE))
+- **Licencia**: doble **MIT OR Apache-2.0** para el código ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)); la marca y el logotipo quedan fuera ([TRADEMARK.md](TRADEMARK.md)); avisos de terceros en [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 
 **Estado: 1.1.0.** Todo lo que promete este README está hecho y comprobado en CI, incluida una ISO real que se hornea y arranca en cada release. Las limitaciones conocidas (firma de sistema, macOS y el host del backend) están al final, en el roadmap.
 
@@ -126,6 +126,19 @@ Lo que queda, por orden de importancia:
 - **Firma de paquetes a nivel de sistema**: la auto-actualización ya está (claves propias + manifiesto en el host público), pero quitar los avisos del sistema operativo exige un certificado de pago con identidad verificada, así que los instaladores siguen saliendo sin firmar.
 - **macOS** (`.icns` y firma de código) si alguien lo necesita: la matriz de release es Linux + Windows.
 - **Más pruebas de interfaz**: hoy cubren el arranque, el resumen, la navegación y el paso de construir; falta el resto de pasos y la integración con el backend.
+
+## Licencia
+
+El código se distribuye bajo **doble licencia MIT OR Apache-2.0**: puedes elegir
+la que prefieras ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)).
+Es el esquema habitual del ecosistema Rust y añade, frente a MIT solo, una
+concesión explícita de patentes y una cláusula de marcas (Apache-2.0, sección 6).
+
+La **marca** —el nombre DistroForge, el logotipo de Tux forjando y sus iconos—
+no la cubren esas licencias: su política está en [TRADEMARK.md](TRADEMARK.md).
+Los avisos del software de terceros empaquetado (fflate), del que se carga en
+tiempo de ejecución (noVNC) y de lo que va dentro de la imagen Docker (QEMU)
+están en [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 

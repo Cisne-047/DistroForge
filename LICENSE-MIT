@@ -19,17 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## Excepción: identidad del proyecto
-
-El logotipo de DistroForge (`docs/diseno/marca-ilustracion.png` y todos los
-recursos derivados de él: iconos de la aplicación, favicon, apple-touch-icon y
-la marca de la cabecera) es una ilustración original del autor del proyecto y
-**no** queda cubierta por la licencia MIT anterior. No se autoriza su uso para
-identificar otros proyectos ni productos derivados.
-
-El código de terceros empaquetado mantiene su propia licencia; en particular,
-`rust/web-ui/public/fflate.js` es fflate 0.8.2, distribuido bajo licencia MIT
-(https://github.com/101arrowz/fflate).

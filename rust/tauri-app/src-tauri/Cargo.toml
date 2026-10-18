@@ -3,7 +3,7 @@ name = "forge-tauri"
 version = "1.1.0"
 edition = "2021"
 description = "Scaffold de versión de escritorio de DistroForge (Tauri 2 + forge-core)"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

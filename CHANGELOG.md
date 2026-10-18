@@ -2,6 +2,19 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su etiqueta, con los paquetes firmados y la ISO construida y arrancada en CI.
 
+## [Sin publicar]
+
+### Cambiado
+
+- **Licencia doble MIT OR Apache-2.0**: el código pasa de MIT a `MIT OR Apache-2.0`
+  (a elegir), con `LICENSE-MIT` y `LICENSE-APACHE` y el campo `license` de los seis
+  paquetes actualizado. Frente a MIT solo, Apache-2.0 añade concesión explícita de
+  patentes y cláusula de marcas.
+- **La marca sale del fichero de licencia**: el logotipo y el nombre pasan a
+  [TRADEMARK.md](TRADEMARK.md) como política de marca (una licencia de copyright no
+  puede "exceptuar" ficheros) y se añade [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+  con fflate (MIT), noVNC (MPL-2.0, por CDN) y QEMU en la imagen Docker (GPL-2.0).
+
 ## [1.1.0] - 2026-10-17
 
 ### Añadido
