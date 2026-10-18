@@ -167,4 +167,9 @@ jobs:
             exit 0
           fi
           sha256sum "${isos[0]}" | awk '{print $1}' > "${isos[0]}.sha256"
-          gh release upload "$GITHUB_REF_NAME" "${isos[@]}" "${isos[0]}.sha256" --clobber
+          # Nombre acorde a los paquetes (DistroForge_1.1.0_amd64.deb, ...): el
+          # de live-build es genérico y no dice de qué versión es.
+          nombre="DistroForge-${GITHUB_REF_NAME#v}-amd64.iso"
+          cp "${isos[0]}" "/tmp/$nombre"
+          sha256sum "/tmp/$nombre" | awk '{print $1}' > "/tmp/$nombre.sha256"
+          gh release upload "$GITHUB_REF_NAME" "/tmp/$nombre" "/tmp/$nombre.sha256" --clobber
