@@ -116,7 +116,7 @@ directorio), exige un fichero regular y limita las sesiones simultáneas. La ses
 de la API se marca `Secure` cuando la petición trae `X-Forwarded-Proto: https`, y la
 API responde con CSP estricta salvo en `/vnc.html` (noVNC se carga desde CDN).
 
-Comprobación rápida: `GET /api/health` → `{"status":"ok","service":"distroforge-server","version":"1.1.0"}`.
+Comprobación rápida: `GET /api/health` → `{"status":"ok","service":"distroforge-server","version":"1.1.1"}`.
 
 ## Imagen
 

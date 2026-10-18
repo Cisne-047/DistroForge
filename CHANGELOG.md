@@ -2,7 +2,7 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. Cada versión se publica desde su etiqueta, con los paquetes firmados y la ISO construida y arrancada en CI.
 
-## [Sin publicar]
+## [1.1.1] - 2026-10-18
 
 ### Cambiado
 

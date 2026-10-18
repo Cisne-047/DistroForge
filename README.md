@@ -7,7 +7,7 @@ Constructor de distribuciones Linux personalizadas: eliges base, escritorio, paq
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 - **Licencia**: doble **MIT OR Apache-2.0** para el código ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)); la marca y el logotipo quedan fuera ([TRADEMARK.md](TRADEMARK.md)); avisos de terceros en [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 
-**Estado: 1.1.0.** Todo lo que promete este README está hecho y comprobado en CI, incluida una ISO real que se hornea y arranca en cada release. Las limitaciones conocidas (firma de sistema, macOS y el host del backend) están al final, en el roadmap.
+**Estado: 1.1.1.** Todo lo que promete este README está hecho y comprobado en CI, incluida una ISO real que se hornea y arranca en cada release. Las limitaciones conocidas (firma de sistema, macOS y el host del backend) están al final, en el roadmap.
 
 Todo el código es Rust desde la v0.4.0: la UI web (Leptos/WASM), el núcleo generador (`forge-core`), el CLI, el backend con Test Drive VNC (`axum`) y la app de escritorio (Tauri 2).
 
